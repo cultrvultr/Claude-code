@@ -1,15 +1,31 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import type { CalculatorInputs, BrandDeal, CalculatorResults } from '../types/calculator';
 import { DEFAULT_INPUTS } from '../types/calculator';
 import { calculateResults } from '../utils/calculations';
+import { getStateFromURL, type ShareableState } from '../utils/export';
+
+const DEFAULT_BRAND_DEALS: BrandDeal[] = [
+  { id: '1', name: 'Brand A', amount: 1000, month: 3 },
+  { id: '2', name: 'Brand B', amount: 3000, month: 5 },
+  { id: '3', name: 'Brand C', amount: 3000, month: 6 },
+];
 
 export function useCalculator() {
   const [inputs, setInputs] = useState<CalculatorInputs>(DEFAULT_INPUTS);
-  const [brandDeals, setBrandDeals] = useState<BrandDeal[]>([
-    { id: '1', name: 'Brand A', amount: 1000, month: 3 },
-    { id: '2', name: 'Brand B', amount: 3000, month: 5 },
-    { id: '3', name: 'Brand C', amount: 3000, month: 6 },
-  ]);
+  const [brandDeals, setBrandDeals] = useState<BrandDeal[]>(DEFAULT_BRAND_DEALS);
+  const [initialized, setInitialized] = useState(false);
+
+  // Load state from URL on mount
+  useEffect(() => {
+    if (initialized) return;
+
+    const urlState = getStateFromURL();
+    if (urlState) {
+      setInputs(urlState.inputs);
+      setBrandDeals(urlState.brandDeals);
+    }
+    setInitialized(true);
+  }, [initialized]);
 
   const results: CalculatorResults = useMemo(() => {
     return calculateResults(inputs, brandDeals);
@@ -42,6 +58,16 @@ export function useCalculator() {
     setBrandDeals(prev => prev.filter(deal => deal.id !== id));
   };
 
+  const loadState = (state: ShareableState) => {
+    setInputs(state.inputs);
+    setBrandDeals(state.brandDeals);
+  };
+
+  const resetToDefaults = () => {
+    setInputs(DEFAULT_INPUTS);
+    setBrandDeals(DEFAULT_BRAND_DEALS);
+  };
+
   return {
     inputs,
     brandDeals,
@@ -50,5 +76,7 @@ export function useCalculator() {
     addBrandDeal,
     updateBrandDeal,
     removeBrandDeal,
+    loadState,
+    resetToDefaults,
   };
 }

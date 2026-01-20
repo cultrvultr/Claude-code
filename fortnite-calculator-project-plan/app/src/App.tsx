@@ -5,6 +5,7 @@ import { SummaryMetrics } from './components/SummaryMetrics';
 import { ProjectionTable } from './components/ProjectionTable';
 import { EarningsChart } from './components/EarningsChart';
 import { CCUChart } from './components/CCUChart';
+import { Toolbar } from './components/Toolbar';
 
 function App() {
   const {
@@ -15,12 +16,14 @@ function App() {
     addBrandDeal,
     updateBrandDeal,
     removeBrandDeal,
+    loadState,
+    resetToDefaults,
   } = useCalculator();
 
   return (
     <div className="min-h-screen bg-gray-100 py-8 px-4">
       <div className="max-w-7xl mx-auto">
-        <header className="text-center mb-8">
+        <header className="text-center mb-6">
           <h1 className="text-3xl font-bold text-gray-800 mb-2">
             Fortnite Map Acquisition Calculator
           </h1>
@@ -28,6 +31,13 @@ function App() {
             Calculate ROI and earn-back periods for Fortnite Creative map investments
           </p>
         </header>
+
+        <Toolbar
+          inputs={inputs}
+          brandDeals={brandDeals}
+          results={results}
+          onLoadScenario={loadState}
+        />
 
         <div className="grid lg:grid-cols-3 gap-6 mb-6">
           <div className="lg:col-span-1 space-y-6">
@@ -39,6 +49,12 @@ function App() {
               onUpdate={updateBrandDeal}
               onRemove={removeBrandDeal}
             />
+            <button
+              onClick={resetToDefaults}
+              className="w-full py-2 px-4 bg-gray-200 hover:bg-gray-300 text-gray-700 rounded-lg transition font-medium"
+            >
+              Reset to Defaults
+            </button>
           </div>
 
           <div className="lg:col-span-2 space-y-6">
@@ -58,7 +74,7 @@ function App() {
         <ProjectionTable projections={results.projections} />
 
         <footer className="mt-8 text-center text-sm text-gray-500">
-          <p>Based on $50 earnings per CCU per month</p>
+          <p>Based on ${inputs.earningsPerCCU} earnings per CCU per month</p>
         </footer>
       </div>
     </div>
