@@ -1,0 +1,57 @@
+import { useCalculator } from './hooks/useCalculator';
+import { InputSection } from './components/InputSection';
+import { BrandDealsSection } from './components/BrandDealsSection';
+import { SummaryMetrics } from './components/SummaryMetrics';
+import { ProjectionTable } from './components/ProjectionTable';
+
+function App() {
+  const {
+    inputs,
+    brandDeals,
+    results,
+    updateInput,
+    addBrandDeal,
+    updateBrandDeal,
+    removeBrandDeal,
+  } = useCalculator();
+
+  return (
+    <div className="min-h-screen bg-gray-100 py-8 px-4">
+      <div className="max-w-7xl mx-auto">
+        <header className="text-center mb-8">
+          <h1 className="text-3xl font-bold text-gray-800 mb-2">
+            Fortnite Map Acquisition Calculator
+          </h1>
+          <p className="text-gray-600">
+            Calculate ROI and earn-back periods for Fortnite Creative map investments
+          </p>
+        </header>
+
+        <div className="grid lg:grid-cols-3 gap-6 mb-6">
+          <div className="lg:col-span-1 space-y-6">
+            <InputSection inputs={inputs} onUpdate={updateInput} />
+            <BrandDealsSection
+              brandDeals={brandDeals}
+              totalBrandDeals={results.totalBrandDeals}
+              onAdd={addBrandDeal}
+              onUpdate={updateBrandDeal}
+              onRemove={removeBrandDeal}
+            />
+          </div>
+
+          <div className="lg:col-span-2">
+            <SummaryMetrics results={results} investmentSum={inputs.investmentSum} />
+          </div>
+        </div>
+
+        <ProjectionTable projections={results.projections} />
+
+        <footer className="mt-8 text-center text-sm text-gray-500">
+          <p>Based on $50 earnings per CCU per month</p>
+        </footer>
+      </div>
+    </div>
+  );
+}
+
+export default App;

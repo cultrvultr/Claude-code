@@ -1,0 +1,15 @@
+# Ralph temporary files
+.call_count
+.circuit_breaker_history
+.circuit_breaker_state
+.exit_signals
+.last_reset
+.ralph_session
+.ralph_session_history
+progress.json
+status.json
+logs/
+
+# Node
+node_modules/
+dist/
