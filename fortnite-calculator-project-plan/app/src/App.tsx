@@ -3,6 +3,8 @@ import { InputSection } from './components/InputSection';
 import { BrandDealsSection } from './components/BrandDealsSection';
 import { SummaryMetrics } from './components/SummaryMetrics';
 import { ProjectionTable } from './components/ProjectionTable';
+import { EarningsChart } from './components/EarningsChart';
+import { CCUChart } from './components/CCUChart';
 
 function App() {
   const {
@@ -39,8 +41,17 @@ function App() {
             />
           </div>
 
-          <div className="lg:col-span-2">
+          <div className="lg:col-span-2 space-y-6">
             <SummaryMetrics results={results} investmentSum={inputs.investmentSum} />
+            <EarningsChart
+              projections={results.projections}
+              investmentSum={inputs.investmentSum}
+            />
+            <CCUChart
+              projections={results.projections}
+              startingCCU={inputs.startingCCU}
+              ccuFloor={inputs.ccuFloor}
+            />
           </div>
         </div>
 
