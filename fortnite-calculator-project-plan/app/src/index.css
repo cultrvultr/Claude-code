@@ -4,4 +4,11 @@ body {
   background-color: rgb(249 250 251);
   color: rgb(17 24 39);
   min-height: 100vh;
+  transition: background-color 0.3s, color 0.3s;
+}
+
+.dark body,
+html.dark body {
+  background-color: rgb(17 24 39);
+  color: rgb(243 244 246);
 }

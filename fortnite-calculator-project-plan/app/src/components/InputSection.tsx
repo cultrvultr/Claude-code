@@ -19,10 +19,10 @@ interface InputFieldProps {
 function InputField({ label, value, onChange, prefix, suffix, min, max, step = 1 }: InputFieldProps) {
   return (
     <div className="mb-4">
-      <label className="block text-sm font-medium text-gray-700 mb-1">{label}</label>
+      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">{label}</label>
       <div className="relative">
         {prefix && (
-          <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500">{prefix}</span>
+          <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 dark:text-gray-400">{prefix}</span>
         )}
         <input
           type="number"
@@ -31,10 +31,10 @@ function InputField({ label, value, onChange, prefix, suffix, min, max, step = 1
           min={min}
           max={max}
           step={step}
-          className={`w-full px-3 py-2 border-2 border-blue-300 rounded-lg bg-blue-50 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 outline-none transition ${prefix ? 'pl-8' : ''} ${suffix ? 'pr-12' : ''}`}
+          className={`w-full px-3 py-2 border-2 border-blue-300 dark:border-blue-600 rounded-lg bg-blue-50 dark:bg-blue-900/30 text-gray-900 dark:text-white focus:border-blue-500 focus:ring-2 focus:ring-blue-200 dark:focus:ring-blue-800 outline-none transition ${prefix ? 'pl-8' : ''} ${suffix ? 'pr-12' : ''}`}
         />
         {suffix && (
-          <span className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500">{suffix}</span>
+          <span className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 dark:text-gray-400">{suffix}</span>
         )}
       </div>
     </div>
@@ -43,9 +43,9 @@ function InputField({ label, value, onChange, prefix, suffix, min, max, step = 1
 
 export function InputSection({ inputs, onUpdate }: InputSectionProps) {
   return (
-    <div className="bg-white rounded-xl shadow-lg p-6">
-      <h2 className="text-xl font-bold text-gray-800 mb-4">Investment Parameters</h2>
-      <p className="text-sm text-blue-600 mb-4">Blue fields are editable</p>
+    <div className="bg-white dark:bg-gray-800 rounded-xl shadow-lg p-6">
+      <h2 className="text-xl font-bold text-gray-800 dark:text-white mb-4">Investment Parameters</h2>
+      <p className="text-sm text-blue-600 dark:text-blue-400 mb-4">Blue fields are editable</p>
 
       <InputField
         label="Investment Sum (USD)"

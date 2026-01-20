@@ -1,4 +1,5 @@
 import { useCalculator } from './hooks/useCalculator';
+import { useDarkMode } from './hooks/useDarkMode';
 import { InputSection } from './components/InputSection';
 import { BrandDealsSection } from './components/BrandDealsSection';
 import { SummaryMetrics } from './components/SummaryMetrics';
@@ -6,6 +7,8 @@ import { ProjectionTable } from './components/ProjectionTable';
 import { EarningsChart } from './components/EarningsChart';
 import { CCUChart } from './components/CCUChart';
 import { Toolbar } from './components/Toolbar';
+import { DarkModeToggle } from './components/DarkModeToggle';
+import { ScenarioComparison } from './components/ScenarioComparison';
 
 function App() {
   const {
@@ -20,24 +23,35 @@ function App() {
     resetToDefaults,
   } = useCalculator();
 
+  const { isDark, toggle: toggleDarkMode } = useDarkMode();
+
   return (
-    <div className="min-h-screen bg-gray-100 py-8 px-4">
+    <div className="min-h-screen bg-gray-100 dark:bg-gray-900 py-8 px-4 transition-colors">
+      <DarkModeToggle isDark={isDark} onToggle={toggleDarkMode} />
+
       <div className="max-w-7xl mx-auto">
         <header className="text-center mb-6">
-          <h1 className="text-3xl font-bold text-gray-800 mb-2">
+          <h1 className="text-3xl font-bold text-gray-800 dark:text-white mb-2">
             Fortnite Map Acquisition Calculator
           </h1>
-          <p className="text-gray-600">
+          <p className="text-gray-600 dark:text-gray-400">
             Calculate ROI and earn-back periods for Fortnite Creative map investments
           </p>
         </header>
 
-        <Toolbar
-          inputs={inputs}
-          brandDeals={brandDeals}
-          results={results}
-          onLoadScenario={loadState}
-        />
+        <div className="flex flex-wrap gap-3 mb-6 justify-center">
+          <Toolbar
+            inputs={inputs}
+            brandDeals={brandDeals}
+            results={results}
+            onLoadScenario={loadState}
+          />
+          <ScenarioComparison
+            currentInputs={inputs}
+            currentBrandDeals={brandDeals}
+            currentResults={results}
+          />
+        </div>
 
         <div className="grid lg:grid-cols-3 gap-6 mb-6">
           <div className="lg:col-span-1 space-y-6">
@@ -51,7 +65,7 @@ function App() {
             />
             <button
               onClick={resetToDefaults}
-              className="w-full py-2 px-4 bg-gray-200 hover:bg-gray-300 text-gray-700 rounded-lg transition font-medium"
+              className="w-full py-2 px-4 bg-gray-200 hover:bg-gray-300 dark:bg-gray-700 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-200 rounded-lg transition font-medium"
             >
               Reset to Defaults
             </button>
@@ -73,7 +87,7 @@ function App() {
 
         <ProjectionTable projections={results.projections} />
 
-        <footer className="mt-8 text-center text-sm text-gray-500">
+        <footer className="mt-8 text-center text-sm text-gray-500 dark:text-gray-400">
           <p>Based on ${inputs.earningsPerCCU} earnings per CCU per month</p>
         </footer>
       </div>

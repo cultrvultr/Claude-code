@@ -15,12 +15,12 @@ interface MetricCardProps {
 
 function MetricCard({ label, value, sublabel, highlight }: MetricCardProps) {
   return (
-    <div className={`p-4 rounded-lg ${highlight ? 'bg-green-50 border-2 border-green-200' : 'bg-gray-50'}`}>
-      <p className="text-sm text-gray-600 mb-1">{label}</p>
-      <p className={`text-2xl font-bold ${highlight ? 'text-green-600' : 'text-gray-800'}`}>
+    <div className={`p-4 rounded-lg ${highlight ? 'bg-green-50 dark:bg-green-900/30 border-2 border-green-200 dark:border-green-700' : 'bg-gray-50 dark:bg-gray-700'}`}>
+      <p className="text-sm text-gray-600 dark:text-gray-400 mb-1">{label}</p>
+      <p className={`text-2xl font-bold ${highlight ? 'text-green-600 dark:text-green-400' : 'text-gray-800 dark:text-white'}`}>
         {value}
       </p>
-      {sublabel && <p className="text-xs text-gray-500 mt-1">{sublabel}</p>}
+      {sublabel && <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">{sublabel}</p>}
     </div>
   );
 }
@@ -33,8 +33,8 @@ export function SummaryMetrics({ results, investmentSum }: SummaryMetricsProps) 
   };
 
   return (
-    <div className="bg-white rounded-xl shadow-lg p-6">
-      <h2 className="text-xl font-bold text-gray-800 mb-4">Summary</h2>
+    <div className="bg-white dark:bg-gray-800 rounded-xl shadow-lg p-6">
+      <h2 className="text-xl font-bold text-gray-800 dark:text-white mb-4">Summary</h2>
 
       <div className="grid grid-cols-2 gap-4">
         <MetricCard
@@ -62,8 +62,8 @@ export function SummaryMetrics({ results, investmentSum }: SummaryMetricsProps) 
         />
       </div>
 
-      <div className="mt-4 p-4 bg-blue-50 rounded-lg border border-blue-200">
-        <p className="text-sm text-blue-800">
+      <div className="mt-4 p-4 bg-blue-50 dark:bg-blue-900/30 rounded-lg border border-blue-200 dark:border-blue-700">
+        <p className="text-sm text-blue-800 dark:text-blue-300">
           <strong>Investment:</strong> {formatCurrency(investmentSum)}
         </p>
       </div>
