@@ -14,10 +14,10 @@ export function Counter({ value, prefix = '', suffix, label }: CounterProps) {
 
   return (
     <div ref={ref} className="text-center">
-      <div className="font-mono text-3xl md:text-4xl font-bold text-xp-green">
+      <dt className="text-xp-muted text-sm order-2 mt-1">{label}</dt>
+      <dd className="font-mono text-3xl md:text-4xl font-bold text-xp-green order-1">
         {prefix}{count}{suffix}
-      </div>
-      <div className="text-xp-muted text-sm mt-1">{label}</div>
+      </dd>
     </div>
   )
 }

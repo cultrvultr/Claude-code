@@ -27,15 +27,15 @@ export function Testimonials() {
             transition={{ delay: i * 0.15, duration: 0.5 }}
           >
             <Card className="h-full flex flex-col">
-              <Quote size={24} className="text-xp-green/30 mb-4" />
-              <p className="text-sm text-xp-muted leading-relaxed flex-1">
+              <Quote size={24} className="text-xp-green/30 mb-4" aria-hidden="true" />
+              <blockquote className="text-sm text-xp-muted leading-relaxed flex-1">
                 &ldquo;{t.quote}&rdquo;
-              </p>
+              </blockquote>
               <div className="mt-6 pt-4 border-t border-xp-border flex items-center gap-3">
                 <PlatformIcon platform={t.platform} size={36} />
                 <div>
                   <p className="text-sm font-semibold text-xp-text">{t.name}</p>
-                  <p className="text-xs text-xp-muted">{t.role}</p>
+                  <p className="text-xs text-xp-muted">{t.handle} · {t.role}</p>
                 </div>
               </div>
             </Card>

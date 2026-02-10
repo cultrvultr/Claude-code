@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useId, useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { ChevronDown } from 'lucide-react'
 
@@ -9,26 +9,38 @@ interface AccordionItemProps {
 
 export function AccordionItem({ question, answer }: AccordionItemProps) {
   const [isOpen, setIsOpen] = useState(false)
+  const id = useId()
+  const panelId = `${id}-panel`
+  const buttonId = `${id}-button`
 
   return (
     <div className="border border-xp-border rounded-lg overflow-hidden">
-      <button
-        type="button"
-        onClick={() => setIsOpen(!isOpen)}
-        className="w-full flex items-center justify-between p-5 text-left hover:bg-xp-card/50 transition-colors cursor-pointer"
-      >
-        <span className="font-semibold text-xp-text pr-4">{question}</span>
-        <motion.span
-          animate={{ rotate: isOpen ? 180 : 0 }}
-          transition={{ duration: 0.2 }}
-          className="flex-shrink-0"
+      <h3>
+        <button
+          type="button"
+          id={buttonId}
+          aria-expanded={isOpen}
+          aria-controls={panelId}
+          onClick={() => setIsOpen(!isOpen)}
+          className="w-full flex items-center justify-between p-5 text-left hover:bg-xp-card/50 transition-colors cursor-pointer"
         >
-          <ChevronDown size={20} className="text-xp-muted" />
-        </motion.span>
-      </button>
+          <span className="font-semibold text-xp-text pr-4">{question}</span>
+          <motion.span
+            animate={{ rotate: isOpen ? 180 : 0 }}
+            transition={{ duration: 0.2 }}
+            className="flex-shrink-0"
+            aria-hidden="true"
+          >
+            <ChevronDown size={20} className="text-xp-muted" />
+          </motion.span>
+        </button>
+      </h3>
       <AnimatePresence>
         {isOpen && (
           <motion.div
+            id={panelId}
+            role="region"
+            aria-labelledby={buttonId}
             initial={{ height: 0, opacity: 0 }}
             animate={{ height: 'auto', opacity: 1 }}
             exit={{ height: 0, opacity: 0 }}

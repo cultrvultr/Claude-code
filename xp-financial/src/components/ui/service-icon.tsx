@@ -10,6 +10,7 @@ import {
   Users,
   Monitor,
   Globe,
+  HelpCircle,
 } from 'lucide-react'
 
 const iconMap = {
@@ -33,7 +34,6 @@ interface ServiceIconProps {
 }
 
 export function ServiceIcon({ name, size = 24, className = '' }: ServiceIconProps) {
-  const Icon = iconMap[name as keyof typeof iconMap]
-  if (!Icon) return null
-  return <Icon size={size} className={className} />
+  const Icon = iconMap[name as keyof typeof iconMap] ?? HelpCircle
+  return <Icon size={size} className={className} aria-hidden="true" />
 }
