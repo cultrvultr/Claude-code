@@ -1,0 +1,104 @@
+@import "tailwindcss";
+
+@theme {
+  --color-xp-dark: #0A0E1A;
+  --color-xp-darker: #060912;
+  --color-xp-surface: #111827;
+  --color-xp-card: #1A1F2E;
+  --color-xp-border: #2A2F3E;
+  --color-xp-green: #00E5A0;
+  --color-xp-green-dim: #00B87D;
+  --color-xp-indigo: #6366F1;
+  --color-xp-blue: #3B82F6;
+  --color-xp-text: #F1F5F9;
+  --color-xp-muted: #94A3B8;
+
+  --font-sans: 'Inter', system-ui, sans-serif;
+  --font-mono: 'JetBrains Mono', monospace;
+}
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  font-family: var(--font-sans);
+  background-color: var(--color-xp-dark);
+  color: var(--color-xp-text);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Glow effects */
+.glow-green {
+  box-shadow: 0 0 20px rgba(0, 229, 160, 0.3);
+}
+
+.glow-green-hover:hover {
+  box-shadow: 0 0 30px rgba(0, 229, 160, 0.4);
+}
+
+.glow-indigo {
+  box-shadow: 0 0 20px rgba(99, 102, 241, 0.3);
+}
+
+/* Gradient border card effect */
+.gradient-border {
+  position: relative;
+  background: var(--color-xp-card);
+  border-radius: 12px;
+}
+
+.gradient-border::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: 12px;
+  padding: 1px;
+  background: linear-gradient(135deg, var(--color-xp-green), var(--color-xp-indigo));
+  mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  mask-composite: exclude;
+  opacity: 0;
+  transition: opacity 0.3s ease;
+}
+
+.gradient-border:hover::before {
+  opacity: 1;
+}
+
+/* Grid background pattern */
+.grid-bg {
+  background-image:
+    linear-gradient(rgba(99, 102, 241, 0.03) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(99, 102, 241, 0.03) 1px, transparent 1px);
+  background-size: 60px 60px;
+}
+
+/* Hero gradient */
+.hero-gradient {
+  background: linear-gradient(135deg, #0A0E1A 0%, #1A0E2E 50%, #0A1A2E 100%);
+}
+
+/* Scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--color-xp-dark);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--color-xp-border);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--color-xp-muted);
+}
