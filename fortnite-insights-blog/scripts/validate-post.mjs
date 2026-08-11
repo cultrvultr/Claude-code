@@ -94,6 +94,13 @@ for (const f of files) {
     }
   }
 
+  // News posts must attribute at least one resolvable source.
+  if (data.type === "news") {
+    const ok =
+      Array.isArray(data.sources) && data.sources.some((s) => s && isHttpUrl(s.url));
+    if (!ok) fail(full, `news post must attribute at least one source with an http(s) url`);
+  }
+
   // Hard attribution gate for insight posts: must be backed by Chartis.
   if (data.type === "insight") {
     const hasChartisMetric = metrics.some(

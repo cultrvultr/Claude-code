@@ -41,10 +41,32 @@ deterministic generator in `scripts/`.
 > `hasCachedAnalytics: false` with empty figures. The generator refuses these by design. Keep a
 > curated candidate list of islands that have live ReadyUp or cached data, and expand it over time.
 
-## News firing (Phase 3 — not yet built)
+## News firing (Phase 3 — implemented)
 
-- Run the allowlisted scraper, dedupe headlines against published posts, draft a `type: news` post
-  (news posts don't require a Chartis metric, but must still list their sources), then gate + publish.
+> **Egress constraint:** this environment's network proxy blocks non-allowlisted domains, so the
+> `scrape-news.mjs` HTTP fetcher **cannot reach live news sites from inside a Claude Routine here.**
+> Two supported paths:
+>
+> 1. **In the Claude Routine (this environment):** use the **`WebSearch`** tool (allowed) to discover
+>    current Fortnite/UEFN news, then scaffold the post with `new-news-post.mjs`. This is the default.
+> 2. **In GitHub Actions (open egress):** run `npm run scrape` to fetch the allowlisted RSS feeds and
+>    emit `candidates.json`; a follow-up step (or a Claude step) turns a candidate into a post.
+
+Steps (Routine / WebSearch path):
+1. `WebSearch` for the latest Fortnite/UEFN/Creative news; pick 1 item not already published
+   (dedupe against `content/posts/*.md` titles + source URLs).
+2. Draft a short factual body (2–4 sections) and write it with:
+   ```
+   node scripts/new-news-post.mjs --title "…" --url "<source>" --source "<name>" \
+     --tier official --summary "…" --topics "fortnite,uefn,news" --body-file body.md
+   ```
+   News posts don't require a Chartis metric, but the validator requires at least one attributed
+   source URL.
+3. Gate + publish: `npm test && npm run validate && npm run build`, then commit + push.
+
+Steps (GitHub Actions / scraper path):
+1. `npm run scrape -- --out candidates.json` (fetches allowlisted RSS, dedupes, respects robots.txt).
+2. Convert a chosen candidate into a post via `new-news-post.mjs`, then gate + publish.
 
 ## Hard data-safety rules
 

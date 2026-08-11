@@ -1,0 +1,36 @@
+{
+  "//": "Allowlist for the limited news scraper. Only enabled sources are fetched. Prefer official/RSS. Edit freely.",
+  "keywords": ["fortnite", "uefn", "creative", "island", "epic games", "battle royale", "creator"],
+  "sources": [
+    {
+      "name": "Epic Developer Community — Fortnite ecosystem & UEFN release notes",
+      "tier": "official",
+      "type": "html",
+      "url": "https://dev.epicgames.com/documentation/en-us/fortnite/fortnite-ecosystem-updates-and-release-notes",
+      "enabled": true,
+      "note": "Authoritative UEFN/Creative release notes. HTML (no clean RSS) — scrape politely, low frequency."
+    },
+    {
+      "name": "Fortnite.GG News",
+      "tier": "community",
+      "type": "rss",
+      "url": "https://fortnite.gg/rss",
+      "enabled": true
+    },
+    {
+      "name": "FortniteNews.com",
+      "tier": "community",
+      "type": "rss",
+      "url": "https://fortnitenews.com/feed/",
+      "enabled": true
+    },
+    {
+      "name": "Fortnite Wiki — Patch Notes",
+      "tier": "community",
+      "type": "html",
+      "url": "https://fortnite.fandom.com/wiki/Patch_Notes",
+      "enabled": false,
+      "note": "Enable if fandom terms permit; prefer the API endpoint over HTML scraping."
+    }
+  ]
+}

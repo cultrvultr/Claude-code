@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0">
+  <channel>
+    <title>Sample Fortnite Feed</title>
+    <link>https://example.com</link>
+    <description>Fixture feed for tests</description>
+    <item>
+      <title><![CDATA[Fortnite Creative & UEFN v41.30 release notes]]></title>
+      <link>https://example.com/uefn-4130</link>
+      <pubDate>Mon, 10 Aug 2026 12:00:00 GMT</pubDate>
+      <description><![CDATA[New UEFN devices and Creative fixes land in the v41.30 ecosystem update.]]></description>
+    </item>
+    <item>
+      <title>Rising Fortnite island tops the discovery charts this week</title>
+      <link>https://example.com/rising-island</link>
+      <pubDate>Sun, 09 Aug 2026 09:30:00 GMT</pubDate>
+      <description>A new Creative map climbs fast in Fortnite discovery.</description>
+    </item>
+    <item>
+      <title>Unrelated cooking blog post</title>
+      <link>https://example.com/cooking</link>
+      <pubDate>Sat, 08 Aug 2026 08:00:00 GMT</pubDate>
+      <description>How to make sourdough at home.</description>
+    </item>
+  </channel>
+</rss>
