@@ -1,0 +1,25 @@
+{
+  "found": true,
+  "hasCachedAnalytics": true,
+  "game": {
+    "id": "f63f2603-b500-45d4-af4b-cf4a8d2ac19b",
+    "name": "ZOMBIE ESCAPE TAG",
+    "islandCode": "5263-9200-9917",
+    "creatorPortalDataAccess": true,
+    "dataManuallyImported": false
+  },
+  "dateRange": { "from": "2025-12-06", "to": "2026-07-12" },
+  "plays": { "total": 2309350, "last30Days": 342386, "latestDay": 11754, "latestDate": "2026-07-12", "source": "games.analytics_cache" },
+  "uniquePlayers": { "latest": 8042, "peak": 16318, "latestDate": "2026-07-12", "source": "games.analytics_cache (activePlayersDaily)" },
+  "newReturning": { "latestDate": "2026-07-12", "new": 11, "returning1Month": 89, "returning6Month": 20, "totalNewAllTime": 2753, "source": "games.analytics_cache (newReturningDaily)" },
+  "retention": { "averagePct": 0.2984, "days": 11, "source": "reporting_daily_metrics (metric_key='retention')" },
+  "reporting": { "uniquePlayersSum": 99811, "playsSum": 146540, "source": "reporting_daily_metrics" },
+  "readyupLive": {
+    "window": { "from": "2026-07-12", "to": "2026-08-11" },
+    "totalPlays": 340255,
+    "days": 30,
+    "latestDate": "2026-08-10",
+    "latestDayValues": { "AVG_CCU": 279, "PEAK_CCU": 279, "AVG_PLAY_TIME": 18.35, "MINS_PLAYED": 2689, "DAILY_PLAYS": 163, "UNIQUE_PLAYERS": 393, "FAVORITES": 5, "RECOMMENDATIONS": 0 },
+    "source": "ReadyUp getCampaignMetrics (live; server key; cached ~12h; window <= 30 days)"
+  }
+}

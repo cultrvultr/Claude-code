@@ -1,0 +1,19 @@
+---
+layout: base.njk
+permalink: "/"
+title: false
+---
+<h1>Latest insights</h1>
+<p>Machine-readable index: <a href="{{ site.url }}/api/posts.json">/api/posts.json</a> ·
+LLM manifest: <a href="{{ site.url }}/llms.txt">/llms.txt</a> ·
+Full corpus: <a href="{{ site.url }}/llms-full.txt">/llms-full.txt</a></p>
+<ul>
+{% for post in collections.posts %}
+<li>
+<a href="{{ site.url }}/posts/{{ post.data.slug or post.fileSlug }}/">{{ post.data.title }}</a>
+<span data-type>[{{ post.data.type }}]</span>
+<time datetime="{{ post.data.published_at }}">{{ post.data.published_at }}</time>
+<br><small>{{ post.data.summary }}</small>
+</li>
+{% endfor %}
+</ul>

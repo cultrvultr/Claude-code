@@ -1,0 +1,59 @@
+name: Blog CI
+
+# Builds and validates the machine-first Fortnite Insights blog.
+# Deployment to a public host is intentionally NOT wired here yet — the hosting
+# target/subpath is an open decision (see fortnite-insights-blog/specs/plan.md).
+# This workflow proves the site builds and every post passes the attribution gate.
+
+on:
+  push:
+    branches: ["**"]
+    paths:
+      - "fortnite-insights-blog/**"
+      - ".github/workflows/blog-ci.yml"
+  pull_request:
+    paths:
+      - "fortnite-insights-blog/**"
+      - ".github/workflows/blog-ci.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: fortnite-insights-blog
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Test insight generator
+        run: npm test
+
+      - name: Validate posts (attribution gate)
+        run: npm run validate
+
+      - name: Build site
+        run: npm run build
+        env:
+          SITE_URL: https://example.com
+
+      - name: Verify machine surfaces exist
+        run: |
+          set -e
+          for f in _site/llms.txt _site/llms-full.txt _site/feed.json _site/feed.rss \
+                   _site/feed.atom _site/sitemap.xml _site/robots.txt _site/api/posts.json; do
+            test -s "$f" || { echo "Missing or empty: $f"; exit 1; }
+          done
+          echo "All machine surfaces generated."

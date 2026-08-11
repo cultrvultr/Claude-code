@@ -1,0 +1,82 @@
+# GitHub Pages deploy workflow for the STANDALONE Fortnite Insights repo.
+# Copy this to `.github/workflows/pages.yml` in the new repo (blog at repo root),
+# then enable Pages: Settings → Pages → Build and deployment → Source: GitHub Actions.
+#
+# SITE_URL / PATH_PREFIX are derived so machine surfaces emit correct absolute URLs:
+#   - User/Org page repo (named <owner>.github.io) → served at root, PATH_PREFIX "/".
+#   - Project page repo (any other name)          → served at /<repo>/.
+# Override SITE_URL with a repo variable (Settings → Variables) when using a custom domain.
+
+name: Deploy blog to Pages
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+  # Rebuild a few times a day so scheduled content changes go live even without a push.
+  schedule:
+    - cron: "17 */6 * * *"
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: "pages"
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Install
+        run: npm install
+
+      - name: Test + validate
+        run: |
+          npm test
+          npm run validate
+
+      - name: Resolve SITE_URL / PATH_PREFIX
+        id: url
+        run: |
+          OWNER="${GITHUB_REPOSITORY_OWNER}"
+          REPO="${GITHUB_REPOSITORY#*/}"
+          if [ -n "${{ vars.SITE_URL }}" ]; then
+            echo "site_url=${{ vars.SITE_URL }}" >> "$GITHUB_OUTPUT"
+            echo "path_prefix=/" >> "$GITHUB_OUTPUT"
+          elif [ "$REPO" = "${OWNER}.github.io" ]; then
+            echo "site_url=https://${OWNER}.github.io" >> "$GITHUB_OUTPUT"
+            echo "path_prefix=/" >> "$GITHUB_OUTPUT"
+          else
+            echo "site_url=https://${OWNER}.github.io/${REPO}" >> "$GITHUB_OUTPUT"
+            echo "path_prefix=/${REPO}/" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Build
+        run: npm run build
+        env:
+          SITE_URL: ${{ steps.url.outputs.site_url }}
+          PATH_PREFIX: ${{ steps.url.outputs.path_prefix }}
+
+      - uses: actions/configure-pages@v4
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: _site
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4
