@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="{{ site.language }}">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{% if title %}{{ title }} — {% endif %}{{ site.name }}</title>
+<meta name="description" content="{{ summary or site.tagline }}">
+{% if canonicalUrl %}<link rel="canonical" href="{{ canonicalUrl }}">{% endif %}
+<meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1">
+<link rel="alternate" type="application/rss+xml" title="{{ site.name }} RSS" href="{{ site.url }}{{ site.feeds.rss }}">
+<link rel="alternate" type="application/atom+xml" title="{{ site.name }} Atom" href="{{ site.url }}{{ site.feeds.atom }}">
+<link rel="alternate" type="application/feed+json" title="{{ site.name }} JSON Feed" href="{{ site.url }}{{ site.feeds.json }}">
+{% if slug %}
+<link rel="alternate" type="text/markdown" href="{{ site.url }}/posts/{{ slug }}.md">
+<link rel="alternate" type="application/json" href="{{ site.url }}/posts/{{ slug }}.json">
+{% endif %}
+{{ headExtra | safe }}
+</head>
+<body>
+<header>
+<a href="{{ site.url }}/"><strong>{{ site.name }}</strong></a>
+<p>{{ site.tagline }}</p>
+<nav>
+<a href="{{ site.url }}/llms.txt">llms.txt</a> ·
+<a href="{{ site.url }}{{ site.feeds.json }}">JSON Feed</a> ·
+<a href="{{ site.url }}{{ site.feeds.rss }}">RSS</a> ·
+<a href="{{ site.url }}/api/posts.json">API</a> ·
+<a href="{{ site.url }}/sitemap.xml">sitemap</a>
+</nav>
+</header>
+<main>
+{{ content | safe }}
+</main>
+<footer>
+<p>Data primarily from <a href="https://chartis.gg" rel="nofollow">Chartis</a>. Content licensed
+<a href="{{ site.licenseUrl }}">{{ site.license }}</a> — free for machine and human reuse with attribution.</p>
+</footer>
+</body>
+</html>

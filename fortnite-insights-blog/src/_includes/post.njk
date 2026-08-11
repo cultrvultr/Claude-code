@@ -1,0 +1,55 @@
+---
+layout: base.njk
+---
+<script type="application/ld+json">{{ jsonld | safe }}</script>
+<article>
+<h1>{{ title }}</h1>
+<p><em>{{ summary }}</em></p>
+<p>
+  <span data-field="type">{{ type }}</span> ·
+  <time datetime="{{ published_at }}">{{ published_at }}</time>
+  {% if topics %}· {% for t in topics %}<span data-topic>{{ t }}</span>{% if not loop.last %}, {% endif %}{% endfor %}{% endif %}
+</p>
+
+{% if metrics and metrics.length %}
+<section data-section="metrics">
+<h2>Metrics</h2>
+<table>
+<thead><tr><th>Metric</th><th>Value</th><th>Unit</th><th>Source</th><th>Retrieved</th></tr></thead>
+<tbody>
+{% for m in metrics %}
+<tr>
+<td>{{ m.name }}</td>
+<td>{{ m.value }}</td>
+<td>{{ m.unit }}</td>
+<td>{% if m.source_url %}<a href="{{ m.source_url }}">{{ m.source }}</a>{% else %}{{ m.source }}{% endif %}</td>
+<td><time datetime="{{ m.retrieved_at }}">{{ m.retrieved_at }}</time></td>
+</tr>
+{% endfor %}
+</tbody>
+</table>
+</section>
+{% endif %}
+
+<section data-section="body">
+{{ content | safe }}
+</section>
+
+{% if sources and sources.length %}
+<section data-section="sources">
+<h2>Sources</h2>
+<ul>
+{% for s in sources %}
+<li><a href="{{ s.url }}" rel="nofollow">{{ s.name }}</a> ({{ s.type }})</li>
+{% endfor %}
+</ul>
+</section>
+{% endif %}
+
+<footer>
+<p>Machine formats:
+<a href="{{ site.url }}/posts/{{ slug }}.json">JSON</a> ·
+<a href="{{ site.url }}/posts/{{ slug }}.md">Markdown</a>
+</p>
+</footer>
+</article>
