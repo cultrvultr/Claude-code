@@ -1,36 +1,99 @@
 {
-  "//": "Allowlist for the limited news scraper. Only enabled sources are fetched. Prefer official/RSS. Edit freely.",
-  "keywords": ["fortnite", "uefn", "creative", "island", "epic games", "battle royale", "creator"],
+  "//": "Curated source allowlist. Roles: 'feed' = well-formed RSS/Atom the scraper fetches; 'discovery' = HTML trackers for rising-map signals (parse in Actions, or corroborate Chartis); 'official' = authoritative HTML (discover via WebSearch in the Routine, no clean RSS). 'verified' notes whether the URL was confirmed to exist via research; feed VALIDITY is confirmed on the first live Actions run (egress is blocked in the Routine env).",
+  "keywords": [
+    "fortnite", "uefn", "creative", "island", "map code", "epic games",
+    "battle royale", "creator", "verse", "discover", "ecosystem", "release notes"
+  ],
   "sources": [
     {
-      "name": "Epic Developer Community — Fortnite ecosystem & UEFN release notes",
-      "tier": "official",
-      "type": "html",
-      "url": "https://dev.epicgames.com/documentation/en-us/fortnite/fortnite-ecosystem-updates-and-release-notes",
-      "enabled": true,
-      "note": "Authoritative UEFN/Creative release notes. HTML (no clean RSS) — scrape politely, low frequency."
-    },
-    {
-      "name": "Fortnite.GG News",
+      "name": "r/FortniteCreative (new)",
+      "role": "feed",
       "tier": "community",
       "type": "rss",
-      "url": "https://fortnite.gg/rss",
-      "enabled": true
+      "url": "https://www.reddit.com/r/FortniteCreative/new/.rss",
+      "enabled": true,
+      "verified": "subreddit confirmed (developer-supported Creative/UEFN community); Reddit .rss is a standard Atom endpoint"
+    },
+    {
+      "name": "r/uefn (new)",
+      "role": "feed",
+      "tier": "community",
+      "type": "rss",
+      "url": "https://www.reddit.com/r/uefn/new/.rss",
+      "enabled": true,
+      "verified": "subreddit confirmed (UEFN / Verse community); Reddit .rss standard"
+    },
+    {
+      "name": "r/FortNiteBR (new)",
+      "role": "feed",
+      "tier": "community",
+      "type": "rss",
+      "url": "https://www.reddit.com/r/FortNiteBR/new/.rss",
+      "enabled": true,
+      "verified": "large official-adjacent Fortnite subreddit; Reddit .rss standard. Relevance filter trims non-Creative items."
     },
     {
       "name": "FortniteNews.com",
+      "role": "feed",
       "tier": "community",
       "type": "rss",
       "url": "https://fortnitenews.com/feed/",
-      "enabled": true
+      "enabled": true,
+      "verified": "site confirmed; WordPress /feed/ assumed — confirm on first live run"
     },
     {
-      "name": "Fortnite Wiki — Patch Notes",
+      "name": "Epic Developer Community — What's New in UEFN",
+      "role": "official",
+      "tier": "official",
+      "type": "html",
+      "url": "https://dev.epicgames.com/documentation/en-us/fortnite/whats-new-in-unreal-editor-for-fortnite",
+      "enabled": false,
+      "verified": "page confirmed; no RSS. Authoritative UEFN changes — discover via WebSearch in the Routine."
+    },
+    {
+      "name": "Fortnite.com — UEFN & Creative news",
+      "role": "official",
+      "tier": "official",
+      "type": "html",
+      "url": "https://www.fortnite.com/news/tag/fortnite-uefn-and-creative",
+      "enabled": false,
+      "verified": "page confirmed; no clean RSS. Discover via WebSearch in the Routine."
+    },
+    {
+      "name": "Fortnite.GG — Most Played UEFN Maps",
+      "role": "discovery",
       "tier": "community",
       "type": "html",
-      "url": "https://fortnite.fandom.com/wiki/Patch_Notes",
+      "url": "https://fortnite.gg/creative?type=uefn",
       "enabled": false,
-      "note": "Enable if fandom terms permit; prefer the API endpoint over HTML scraping."
+      "verified": "confirmed live tracker: players-now, all-time peak, 24h. Rising-map signal; parse in Actions or corroborate Chartis."
+    },
+    {
+      "name": "Fortnite Creative HQ (FCHQ)",
+      "role": "discovery",
+      "tier": "community",
+      "type": "html",
+      "url": "https://www.fortnitecreativehq.com/",
+      "enabled": false,
+      "verified": "confirmed: 260k+ maps, live counts, daily trending charts. Rising-map corroboration."
+    },
+    {
+      "name": "Fortnite Tracker — Maps population",
+      "role": "discovery",
+      "tier": "community",
+      "type": "html",
+      "url": "https://tracker.gg/fortnite/population/maps",
+      "enabled": false,
+      "verified": "confirmed: live player counts per map/island/creator. Rising-map corroboration."
+    },
+    {
+      "name": "YouTube channel feed (template — add creator/Epic channel IDs)",
+      "role": "feed",
+      "tier": "community",
+      "type": "rss",
+      "url": "https://www.youtube.com/feeds/videos.xml?channel_id=CHANNEL_ID_HERE",
+      "enabled": false,
+      "verified": "YouTube per-channel Atom feed is a stable pattern; fill in real channel IDs (Epic, top UEFN creators) to enable."
     }
   ]
 }

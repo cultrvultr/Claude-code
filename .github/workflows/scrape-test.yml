@@ -1,0 +1,37 @@
+name: Scraper live test
+
+# Manual only. Runs the news scraper against the real allowlisted feeds on a
+# GitHub runner (open egress — unlike the Claude environment) and prints which
+# sources actually returned items. Use this to verify/curate sources.json.
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  scrape:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: fortnite-insights-blog
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+      - run: npm install
+      - name: Run scraper against live feeds
+        run: |
+          echo "== per-source results (stderr) =="
+          node scripts/scrape-news.mjs --out candidates.json
+          echo ""
+          echo "== candidates.json =="
+          cat candidates.json
+      - name: Upload candidates
+        uses: actions/upload-artifact@v4
+        with:
+          name: news-candidates
+          path: fortnite-insights-blog/candidates.json
+          if-no-files-found: warn

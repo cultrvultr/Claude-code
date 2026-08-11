@@ -68,6 +68,26 @@ Steps (GitHub Actions / scraper path):
 1. `npm run scrape -- --out candidates.json` (fetches allowlisted RSS, dedupes, respects robots.txt).
 2. Convert a chosen candidate into a post via `new-news-post.mjs`, then gate + publish.
 
+## Source strategy (what to pull from where)
+
+Sources are curated in `scripts/config/sources.json`, tagged by **role**:
+
+- **Rising-map signal (the core of this blog):** **Chartis is primary** (already integrated). For
+  corroboration / islands Chartis hasn't cached, the `discovery` HTML trackers — **fortnite.gg**
+  (`/creative?type=uefn`, live players-now + 24h + all-time peak), **FortniteCreativeHQ**, and
+  **tracker.gg maps population** — are the best public rising-map signals. These are HTML, so parse
+  them in a GitHub Actions step (open egress), not the Routine.
+- **News (`feed` role):** the reliable free feeds are **Reddit** (`r/FortniteCreative`, `r/uefn`,
+  `r/FortNiteBR` `.rss`) and WordPress news feeds (**fortnitenews.com/feed/**). Optionally add
+  **YouTube** channel Atom feeds for Epic + top UEFN creators (fill in channel IDs).
+- **Official (`official` role):** **fortnite.com/news** and Epic's **"What's New in UEFN"** are
+  authoritative but have **no clean RSS**, so discover these via **WebSearch** in the Routine.
+
+> Verify feeds before trusting them: run the **"Scraper live test"** workflow (`workflow_dispatch`)
+> once — it fetches every enabled feed on a GitHub runner and prints which returned items. Enable /
+> prune `sources.json` based on that output. (The scraper can't fetch from the Routine env — egress
+> is blocked there.)
+
 ## Hard data-safety rules
 
 - **Only** use the public game-analytics tools: `get_game_analytics`, `lookup_games`, `search_epic_ip`.
