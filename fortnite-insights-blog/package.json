@@ -8,7 +8,9 @@
     "build": "eleventy",
     "serve": "eleventy --serve",
     "clean": "rm -rf _site",
-    "validate": "node scripts/validate-post.mjs"
+    "validate": "node scripts/validate-post.mjs",
+    "test": "node scripts/test-generator.mjs",
+    "generate": "node scripts/generate-insight-post.mjs"
   },
   "devDependencies": {
     "@11ty/eleventy": "^3.0.0",

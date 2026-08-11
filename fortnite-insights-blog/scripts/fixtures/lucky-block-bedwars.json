@@ -1,0 +1,25 @@
+{
+  "found": true,
+  "hasCachedAnalytics": false,
+  "game": {
+    "id": "ac110e82-208d-49eb-a318-0ef28564108e",
+    "name": "Lucky Block Bedwars",
+    "islandCode": "1734-8951-4401",
+    "creatorPortalDataAccess": false,
+    "dataManuallyImported": false
+  },
+  "dateRange": { "from": "", "to": "" },
+  "plays": { "total": 0, "last30Days": 0, "latestDay": 0, "latestDate": "", "source": "games.analytics_cache" },
+  "uniquePlayers": { "latest": 0, "peak": 0, "latestDate": "", "source": "games.analytics_cache (activePlayersDaily)" },
+  "newReturning": null,
+  "retention": null,
+  "reporting": { "uniquePlayersSum": null, "playsSum": null, "source": "reporting_daily_metrics" },
+  "readyupLive": {
+    "window": { "from": "2026-07-12", "to": "2026-08-11" },
+    "totalPlays": 1598871,
+    "days": 30,
+    "latestDate": "2026-08-10",
+    "latestDayValues": { "AVG_CCU": 1367, "PEAK_CCU": 1367, "AVG_PLAY_TIME": 22.76, "MINS_PLAYED": 15120, "DAILY_PLAYS": 604, "UNIQUE_PLAYERS": 1878, "FAVORITES": 4, "RECOMMENDATIONS": 1 },
+    "source": "ReadyUp getCampaignMetrics (live; server key; cached ~12h; window <= 30 days)"
+  }
+}

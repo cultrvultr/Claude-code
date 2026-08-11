@@ -1,0 +1,12 @@
+{
+  "found": true,
+  "hasCachedAnalytics": false,
+  "game": { "id": "52e13fbd-8afd-4835-8df7-96c32e672f89", "name": "RATED RED VS BLUE", "islandCode": "3569-1141-9181", "creatorPortalDataAccess": false, "dataManuallyImported": false },
+  "dateRange": { "from": "", "to": "" },
+  "plays": { "total": 0, "last30Days": 0, "latestDay": 0, "latestDate": "", "source": "games.analytics_cache" },
+  "uniquePlayers": { "latest": 0, "peak": 0, "latestDate": "", "source": "games.analytics_cache (activePlayersDaily)" },
+  "newReturning": null,
+  "retention": null,
+  "reporting": { "uniquePlayersSum": null, "playsSum": null, "source": "reporting_daily_metrics" },
+  "readyupLive": { "window": { "from": "2026-07-12", "to": "2026-08-11" }, "totalPlays": 0, "days": 0, "latestDate": "", "latestDayValues": {}, "availableMetricKeys": [], "source": "ReadyUp getCampaignMetrics" }
+}
