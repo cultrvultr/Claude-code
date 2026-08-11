@@ -241,3 +241,36 @@ fails the build otherwise. Chartis is credited in-body and in the `sources` bloc
 5. Confirm the **scrape allowlist** (which official + community sources are in-bounds).
 
 Once you approve, I'll start at **Phase 1**.
+
+---
+
+## 11. Build log & findings
+
+- **Phase 1 ✅** Eleventy skeleton + post schema + all machine surfaces (per-post `.md`/`.json`,
+  `/api/posts.json`, JSON Feed/RSS/Atom, `llms.txt`/`llms-full.txt`, `sitemap.xml`, AI-friendly
+  `robots.txt`, JSON-LD) + attribution validator + Blog CI. Green.
+- **Phase 2 ✅** Deterministic Chartis insight generator (`scripts/lib/chartis.mjs`,
+  `render-post.mjs`, `generate-insight-post.mjs`) with lens auto-selection; refuses when no data.
+  Self-test in CI. Generated real posts from live Chartis data.
+- **Phase 3 ✅** Limited news scraper (allowlist + RSS/Atom parser + polite fetch + dedupe) and a
+  `type: news` scaffolder; one real attributed news post shipped.
+- **Phase 4 ⏳** Hosting repo + deploy + every-4h Routine — pending decisions below.
+
+### Key findings that shaped the build
+- **Chartis Desk is internal.** Only the public game-analytics tools (`get_game_analytics`,
+  `lookup_games`, `search_epic_ip`) are used; Desk data (deals/cashflow/contractors/contacts) is
+  never published. `list_games` is workspace-gated (403) — expected.
+- **Most islands return empty analytics** (`hasCachedAnalytics: false`). The generator hard-refuses
+  these, so the blog needs a curated candidate list of islands that actually have data.
+- **Network egress is locked down here.** The proxy blocks non-allowlisted domains (403), so the RSS
+  scraper cannot fetch live sites from inside a Claude Routine in this environment. News discovery in
+  the Routine uses the allowed `WebSearch` tool; the RSS scraper path is for GitHub Actions (open egress).
+- **Chartis-in-cron is uncertain.** Interactively-authorized connectors may be absent in headless
+  scheduled runs. The Routine must detect Chartis availability and degrade gracefully.
+
+### Phase 4 — open decisions
+1. **New repo name** (hosting = dedicated GitHub Pages repo). A user/org page repo named
+   `<owner>.github.io` gives clean root URLs; any other name serves under `/<repo>/`.
+2. **Enable Pages** on the new repo (Settings → Pages → Source: GitHub Actions) — a manual one-time step.
+3. **Arm the every-4h Routine now, or prepare it?** It commits ~6 posts/day continuously; the
+   Chartis-in-cron caveat applies. `deploy/pages.yml` is the ready-to-copy deploy workflow.
