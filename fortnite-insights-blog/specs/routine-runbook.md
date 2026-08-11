@@ -75,8 +75,37 @@ Steps (GitHub Actions / scraper path):
   reporting-task internals, or anything from `get_deal*`, `list_contracts`, `get_cashflow_state`, etc.
 - Every published number must trace to a Chartis source with a `retrieved_at` timestamp.
 
-## Scheduling
+## Deployment (going live)
 
-Create the Routine (or cron trigger) to fire this runbook every 4 hours. Each firing is a fresh
-session that: reads this runbook, does one insight (or news) post, and pushes. Keep the prompt
-pointed at this file so the procedure stays versioned with the code.
+Hosting: **served from this repo's GitHub Pages** alongside the calculator app.
+
+- Calculator → Pages root; blog → `…github.io/<repo>/fortnite-insights/`.
+- Built + deployed by `.github/workflows/deploy.yml` (combined artifact). The blog's `SITE_URL` /
+  `PATH_PREFIX` are derived from the repo; override with a `BLOG_SITE_URL` repo variable (e.g. a
+  custom domain).
+- **One-time setup:** merge this branch into the default branch, and ensure **Settings → Pages →
+  Source = GitHub Actions** is enabled. The deploy job publishes on push to the default branch, on a
+  6-hourly `schedule`, and via `workflow_dispatch`.
+- **Subpath caveat:** crawlers only read `robots.txt` from the domain root, so the blog's
+  `/fortnite-insights/robots.txt` won't be auto-honored. Discovery still works via the page links,
+  `llms.txt`, sitemap, and feeds. A custom domain (or an org `*.github.io` repo) removes this caveat.
+
+## Scheduling (arm the Routine — gentle cadence to start)
+
+Cadence chosen: **1–2 posts/day** to watch quality before ramping to every 4h. Arm it only after the
+deploy is confirmed live. Create a scheduled trigger firing into a fresh session in this environment:
+
+- **Cron:** `0 */12 * * *` (every 12h → ~2 posts/day). Ramp to `0 */4 * * *` later.
+- **Prompt (fresh session):**
+  > Read `fortnite-insights-blog/specs/routine-runbook.md` in this repo and execute ONE posting cycle.
+  > First check whether the Chartis MCP tools are available (`get_game_analytics`). If yes, do an
+  > insight post from a candidate island with real data (skip empties). If Chartis is unavailable, or
+  > it's a news slot, do a news post via `WebSearch` + `new-news-post.mjs`. Run `npm test && npm run
+  > validate && npm run build`, then commit and push. Only publish Chartis-attributed numbers; never
+  > use internal Chartis Desk data.
+
+> **Chartis-in-cron check:** the first armed firing doubles as a test of whether the connector is
+> present in a scheduled session. If it isn't, the cycle degrades to a news post and reports it.
+
+To arm later, use a scheduled-trigger tool (e.g. `create_trigger` with `create_new_session_on_fire`,
+this repo's environment, the cron and prompt above).
