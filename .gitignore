@@ -1,1 +1,4 @@
 ralph-claude-code/
+
+__pycache__/
+*.pyc
