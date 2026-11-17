@@ -1,4 +1,4 @@
-// 6 named files -> 6 channels in their home slots; bank switch; long-press Mute -> Solo.
+// 6 named files -> 6 channels in their home slots; bank switch; Mute held = Solo while held.
 const { chromium, devices } = require('playwright');
 const URL = process.env.URL || 'http://localhost:4173/';
 const fail = m => { console.error('FAIL', m); process.exitCode = 1; };
@@ -27,9 +27,9 @@ function wav(seconds, hz) {   // mono 16-bit sine
   if ((await vis()) !== 'Guitar,Keys') fail('bank 2 shows ' + await vis());
   await p.locator('#banks i').nth(0).tap();
   const m = p.locator('.st .mute').first(), bb = await m.boundingBox();
-  await p.mouse.move(bb.x + 10, bb.y + 10); await p.mouse.down(); await p.waitForTimeout(600); await p.mouse.up();
-  if (!(await m.getAttribute('class')).includes('solo') || (await m.textContent()) !== 'Solo') fail('long press did not solo');
-  await m.tap(); if ((await m.getAttribute('class')).includes('solo')) fail('tap did not un-solo');
+  await p.mouse.move(bb.x + 10, bb.y + 10); await p.mouse.down(); await p.waitForTimeout(500);
+  if (!(await m.getAttribute('class')).includes('solo') || (await m.textContent()) !== 'Solo') fail('holding Mute did not solo');
+  await p.mouse.up(); if ((await m.getAttribute('class')).includes('solo') || (await m.textContent()) !== 'Mute') fail('letting go did not end the solo');
   await m.tap(); if (!(await m.getAttribute('class')).includes('on')) fail('tap did not mute');
   await p.tap('#helpBtn'); if (!(await p.isVisible('.credit a'))) fail('credit link missing');
   if (errs.length) fail('console errors: ' + errs.join(' | '));

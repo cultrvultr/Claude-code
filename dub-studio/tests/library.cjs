@@ -37,7 +37,7 @@ function wav(seconds, hz) {
   if (!items.some(t => t.startsWith('Lib song'))) fail('song not in library: ' + items.join(','));
   if ((await p.$$('#libTakes .lib-item')).length !== 1) fail('take not in library');
   // open the demo (another song), then back: the mix comes back with the song
-  await p.click('#libSheet [data-x]'); await p.tap('#songBtn'); await p.click('#loadDemo'); await p.waitForTimeout(4000);
+  await p.click('#libSheet [data-x]'); await p.tap('#songBtn'); await p.click('#loadDemo'); await p.waitForTimeout(1500);   // switch away while the demo is still being made
   if ((await p.$eval('.st .cap', e => e.style.transform)) === capLow) fail('demo opened with the other song\'s mix');
   await p.tap('#songBtn'); await p.click('#libBtn'); await p.waitForTimeout(500);
   const lib = p.locator('#libSongs .lib-item', { hasText: 'Lib song' });

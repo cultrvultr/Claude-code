@@ -6,7 +6,8 @@ import { freshChan, S, DIVS, VLC, VHC, save, popUndo, canUndo, resetMix, watchUn
 import { makeTour, MIXER_TOUR } from './ui/tour';
 import * as A from './audio/engine';
 import { SPECS } from './audio/irs';
-import { renderDemo } from './audio/demo';
+import { DEMO } from './audio/demo';
+import DemoWorker from './audio/demo.worker.ts?worker';
 import * as Store from './loader/store';
 import * as Split from './split/split';
 import { control, guardPage, clamp, xFrac } from './ui/control';
@@ -57,10 +58,13 @@ document.querySelectorAll<HTMLElement>('.st').forEach(st => {
   const mu = st.querySelector<HTMLElement>('.mute')!;
   const dm = () => { mu.classList.toggle('on', q.mute && !q.solo); mu.classList.toggle('solo', q.solo); mu.textContent = q.solo ? 'Solo' : 'Mute'; };
   draws.push(dm); muteDraws.push(dm);
-  // tap: mute (or un-solo); hold: solo, without ever muting the part on the way
-  control(mu, { longMs: 350,
-    up: s => { if (s.long) return; tick(); if (q.solo) { q.solo = false; A.applySolo(); } else { q.mute = !q.mute; A.applyChan(c, 'mute'); } muteDraws.forEach(f => f()); },
-    long: () => { q.solo = !q.solo; if (q.solo && q.mute) { q.mute = false; A.applyChan(c, 'mute'); } A.applySolo(); tick(); muteDraws.forEach(f => f()); } });
+  // tap: mute. Hold: solo for as long as the finger stays down; letting go puts the part back as it was.
+  control(mu, { longMs: 300,
+    long: g => { (g as typeof g & { wasMuted: boolean }).wasMuted = q.mute; if (q.mute) { q.mute = false; A.applyChan(c, 'mute'); }
+      q.solo = true; A.applySolo(); tick(); muteDraws.forEach(f => f()); },
+    up: g => {
+      if (g.long) { q.solo = false; if ((g as typeof g & { wasMuted: boolean }).wasMuted) { q.mute = true; A.applyChan(c, 'mute'); } A.applySolo(); muteDraws.forEach(f => f()); return; }
+      tick(); q.mute = !q.mute; A.applyChan(c, 'mute'); muteDraws.forEach(f => f()); } });
   const slot = st.querySelector<HTMLElement>('.slot')!;
   draws.push(() => { const s = A.song.stems[c], t = s.status ? '…' : s.name; if (slot.textContent !== t) { slot.textContent = t; fitName(slot); } slot.classList.toggle('empty', !s.meta); st.hidden = c >= A.song.count; });
   control(slot, { undoable: false, up: () => pickOne(c) });
@@ -332,7 +336,7 @@ function songMeta(): Store.SongMeta {
     mix: mixJson(), snaps: getSnaps(), source };
 }
 let created = Date.now(), source: Store.SongMeta['source'] = 'files', persistAsked = false;
-function saveSong() { if (!A.song.id) return; if (!persistAsked) { persistAsked = true; navigator.storage?.persist?.().catch(() => {}); } clearTimeout(metaT); metaT = window.setTimeout(() => { Store.saveMeta(songMeta()); try { localStorage.setItem('dub-studio-last', A.song.id); } catch { /* */ } }, 300); }
+function saveSong(now = false) { if (!A.song.id) return; if (now) { clearTimeout(metaT); Store.saveMeta(songMeta()); try { localStorage.setItem('dub-studio-last', A.song.id); } catch { /* */ } return; } if (!persistAsked) { persistAsked = true; navigator.storage?.persist?.().catch(() => {}); } clearTimeout(metaT); metaT = window.setTimeout(() => { Store.saveMeta(songMeta()); try { localStorage.setItem('dub-studio-last', A.song.id); } catch { /* */ } }, 300); }
 
 // file names to slots: each role has its home channel (see DEFAULT_NAMES)
 const ROLE: [RegExp, number][] = [[/drum|perc|beat|kit/i, 0], [/bass/i, 1], [/other|inst|music|backing/i, 2], [/vox|vocal|voice|sing|acap/i, 3],
@@ -354,11 +358,13 @@ const status = (c: number, t?: string) => { A.song.stems[c].status = t; slotsDra
 const onsetsBy = new Map<number, { on: Float32Array; hop: number }>();
 
 // one stem: decode, hand to the worker (pieces, peaks, loudness, onsets), keep its metadata
+class Superseded extends Error {}   // the song changed while a part was loading: stop quietly
 async function stemFrom(c: number, name: string, channels: () => Promise<Float32Array[]>, file?: string) {
+  const id = A.song.id, same = () => { if (A.song.id !== id) throw new Superseded(); };
   status(c, 'Decoding…');
-  const data = await channels();
+  const data = await channels(); same();
   status(c, 'Saving…');
-  const r = await Store.pieceStem(A.song.id, c, A.song.sr, data);
+  const r = await Store.pieceStem(id, c, A.song.sr, data); same();
   A.song.stems[c].meta = { name, n: r.n, ch: r.ch, dur: r.dur, peaks: r.peaks, ms: r.ms, offset: 0, file };
   A.song.stems[c].name = name; onsetsBy.set(c, { on: r.onsets, hop: r.hop });
   status(c, undefined);
@@ -368,7 +374,7 @@ function finishSong() {
   // tempo: from the drums if there are any, else the first part
   if (A.song.bpmAuto) { const src = onsetsBy.get(0) || onsetsBy.values().next().value; const bpm = src ? Store.detectBpm(src.on, A.song.sr, src.hop) : null; if (bpm) { A.song.bpm = bpm; echoChange(); } }
   A.setSongGain(Store.songGain(A.song.stems.slice(0, A.song.count).map(s => s.meta?.ms || 0)));
-  onsetsBy.clear(); saveSong(); redraw(); slotsDraw(); drawLoop(); drawCues(); media();
+  onsetsBy.clear(); saveSong(true); redraw(); slotsDraw(); drawLoop(); drawCues(); media();
 }
 function newSong(count: number, title: string, id = Store.newSongId()) {
   if (A.playing) { A.stop(); icon(); letSleep(); }
@@ -384,7 +390,7 @@ async function loadInto(c: number, f: File) {
   const wasPlaying = A.playing, t = A.now(); if (wasPlaying) A.stop();
   const name = partName(f, [f]);
   try { await stemFrom(c, name, fromFile(f), f.name); A.songChanged(); }
-  catch { status(c, undefined); toast(`Could not read ${f.name}. Protected (Apple Music) or unsupported file.`, 4500); }
+  catch (e) { if (e instanceof Superseded) return; status(c, undefined); toast(`Could not read ${f.name}. Protected (Apple Music) or unsupported file.`, 4500); }
   if (c !== 0) onsetsBy.clear();   // only the drums re-set the tempo
   finishSong(); if (wasPlaying) A.play(t);
 }
@@ -399,7 +405,7 @@ async function loadMany(files: File[]) {
   let ok = 0;
   for (let i = 0; i < count; i++) { const f = order[i]; if (!f) continue;   // one at a time keeps memory low on a phone
     try { await stemFrom(i, partName(f, fs), fromFile(f), f.name); ok++; }
-    catch { status(i, undefined); toast(`Could not read ${f.name}. Protected (Apple Music) or unsupported file.`, 4500); } }
+    catch (e) { if (e instanceof Superseded) return; status(i, undefined); toast(`Could not read ${f.name}. Protected (Apple Music) or unsupported file.`, 4500); } }
   finishSong(); toast(`Loaded ${ok} track${ok === 1 ? '' : 's'}${A.song.bpmAuto ? ` · ${A.song.bpm} BPM` : ''}`);
 }
 function commonName(fs: File[]) { const n = fs.map(base); let p = n[0] || ''; for (const x of n) while (!x.startsWith(p)) p = p.slice(0, -1); p = p.replace(/[\s_\-.(]+$/, ''); return p.length > 2 ? p : 'My song'; }
@@ -413,14 +419,20 @@ async function openSong(m: Store.SongMeta) {
 }
 async function loadDemo() {
   await A.ensure();
-  const old = await Store.loadMeta('demo');
-  if (old && old.sr === A.ctx!.sampleRate && (!Store.inMemory('demo') ? await Store.readPiece('demo', 0, 0) : true)) { await openSong(old); return; }   // made before: open it
-  toast('Mixing the demo riddim…'); await new Promise(r => setTimeout(r, 30));
-  await Store.deleteSong('demo');
-  const d = renderDemo(A.ctx!.sampleRate);
-  newSong(4, d.title, 'demo'); A.song.bpm = d.bpm; A.song.bpmAuto = false; source = 'demo';
-  for (let i = 0; i < 4; i++) await stemFrom(i, d.names[i], async () => [d.data[i]]);
-  finishSong();
+  const id = DEMO.id, old = await Store.loadMeta(id);
+  if (old && old.sr === A.ctx!.sampleRate && (!Store.inMemory(id) ? await Store.readPiece(id, 0, 0) : true)) { await openSong(old); return; }   // made before: open it
+  Store.deleteSong('demo');   // the first demo song, replaced by this one
+  toast('Making the demo song…', 20000);
+  await Store.deleteSong(id);
+  newSong(DEMO.names.length, DEMO.title, id); A.song.bpm = DEMO.bpm; A.song.bpmAuto = false; source = 'demo';
+  DEMO.names.forEach((nm, i) => { A.song.stems[i].name = nm; A.song.stems[i].status = 'Waiting…'; }); redraw();
+  const w = new DemoWorker(), sr = A.ctx!.sampleRate;
+  try {
+    for (let i = 0; i < DEMO.names.length; i++)   // one part at a time: made in a worker, then cut into pieces
+      await stemFrom(i, DEMO.names[i], () => new Promise<Float32Array[]>(ok => { w.onmessage = e => ok([e.data as Float32Array]); w.postMessage({ i, sr }); }));
+  } catch (e) { if (e instanceof Superseded) { Store.deleteSong(id); return; } throw e; }   // left half made: made again next time
+  finally { w.terminate(); }
+  finishSong(); toast(DEMO.title.replace(' (demo)', '') + ' · ' + DEMO.bpm + ' BPM');
 }
 
 let pickSlot = 0;

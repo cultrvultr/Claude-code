@@ -13,7 +13,7 @@ export const MIXER_TOUR: Step[] = [
   { el: '.st:not(.off):not([hidden]) .kn[data-p="echo"]', h: 'Echo send', t: 'Sends the part to the tape echo. Turn it up for a moment and back down to catch one hit or one word.' },
   { el: '.st:not(.off):not([hidden]) .kn[data-p="verb"]', h: 'Verb send', t: 'Sends the part to the spring reverb.' },
   { el: '.st:not(.off):not([hidden]) .throw', h: 'Throw', t: 'Hold to send the whole part into the echo. Let go and the echoes ring on by themselves.' },
-  { el: '.st:not(.off):not([hidden]) .mute', h: 'Mute and Solo', t: 'Tap to drop the part out. Press and hold to solo it: the button turns green and only soloed parts play.' },
+  { el: '.st:not(.off):not([hidden]) .mute', h: 'Mute and Solo', t: 'Tap to drop the part out. Press and hold to solo it: only that part plays while you hold, and letting go brings everything back.' },
   { el: '#pSir', h: 'Siren', t: 'Starts and stops the siren with the sound set on its page. The small knob is its level.' },
   { el: '#pSyn', h: 'Synare', t: 'Hits the drum synth. Higher on the button hits harder. The small knob is its level.' },
   { el: '.echo', h: 'Echo', t: 'Time between repeats, how many Repeats (past 9 it runs away: drag back below 9), and how loud the echoes Return. Tap sets the tempo by tapping along.' },

@@ -8,24 +8,31 @@ const fail = m => { console.error('FAIL', m); process.exitCode = 1; };
   const ctx = await b.newContext({ ...devices['iPhone 15'] }), p = await ctx.newPage();
   const errs = []; p.on('pageerror', e => errs.push(e.message)); p.on('console', m => { if (m.type() === 'error') errs.push(m.text()); });
   await p.addInitScript(() => localStorage.setItem('dub-studio-toured', '1'));
-  await p.goto(URL); await p.tap('#goDemo'); await p.waitForTimeout(4000);
+  await p.goto(URL); await p.tap('#goDemo');
+  await p.waitForFunction(() => /BPM/.test(document.getElementById('toast').textContent), null, { timeout: 60000 });   // the demo is made
+  await p.waitForFunction(() => { const m = /^0:(\d\d)/.exec(document.getElementById('time').textContent); return m && +m[1] >= 15; }, null, { timeout: 60000 });   // past the intro: the kick is in
   const cdp = await ctx.newCDPSession(p); await cdp.send('Performance.enable');
   const layouts = async () => (await cdp.send('Performance.getMetrics')).metrics.find(m => m.name === 'LayoutCount').value;
   const l0 = await layouts(); await p.waitForTimeout(2000); const idle = await layouts() - l0;
   console.log('  layouts in 2 s of untouched playback:', idle);
   if (idle > 8) fail('the idle mixer lays out ' + idle + ' times in 2 s');
-  // Mute: a tap mutes; holding solos it without muting it on the way
+  // Mute: a tap mutes; holding solos only while held, without muting the part first
   const mu = await p.locator('.st .mute').first().boundingBox(), cls = () => p.getAttribute('.st .mute >> nth=0', 'class');
-  await p.mouse.move(mu.x + 10, mu.y + 10); await p.mouse.down(); await p.waitForTimeout(200);
+  const lv = () => p.evaluate(async () => { const s = [0, 0, 0, 0]; for (let i = 0; i < 16; i++) { await new Promise(r => setTimeout(r, 50)); window.__dub.meters().ch.slice(0, 4).forEach((v, k) => { s[k] = Math.max(s[k], v); }); } return s; });
+  await p.mouse.move(mu.x + 10, mu.y + 10); await p.mouse.down(); await p.waitForTimeout(150);
   if ((await cls()).includes(' on')) fail('holding Mute muted the part before it soloed');
-  await p.waitForTimeout(300); if (!(await cls()).includes('solo')) fail('holding Mute did not solo'); await p.mouse.up();
-  if ((await cls()).includes(' on')) fail('the soloed part is also muted');
-  await p.waitForTimeout(400);
-  const lv = await p.evaluate(async () => { const s = [0, 0, 0, 0]; for (let i = 0; i < 20; i++) { await new Promise(r => setTimeout(r, 50)); window.__dub.meters().ch.slice(0, 4).forEach((v, k) => { s[k] = Math.max(s[k], v); }); } return s; });
-  console.log('  levels with Drums soloed:', lv.map(v => v.toFixed(3)).join(' '));
-  if (lv[0] < 0.005 || Math.max(lv[1], lv[2], lv[3]) > 0.001) fail('solo did not leave only the soloed part playing');
-  await p.locator('.st .mute').first().tap(); if ((await cls()).includes('solo')) fail('a tap did not un-solo');
+  await p.waitForTimeout(300); if (!(await cls()).includes('solo')) fail('holding Mute did not solo');
+  await p.waitForTimeout(200); const held = await lv();
+  console.log('  levels while Drums is held soloed:', held.map(v => v.toFixed(3)).join(' '));
+  if (held[0] < 0.005 || Math.max(held[1], held[2], held[3]) > 0.001) fail('solo did not leave only the held part playing');
+  await p.mouse.up(); await p.waitForTimeout(100);
+  if ((await cls()).includes('solo') || (await cls()).includes(' on')) fail('letting go did not put the part back');
+  const after = await lv(); if (Math.max(after[1], after[2], after[3]) < 0.001) fail('the other parts did not come back after letting go');
   await p.locator('.st .mute').first().tap(); if (!(await cls()).includes(' on')) fail('a tap did not mute');
+  // a muted part held: it plays solo while held, and is muted again after
+  await p.mouse.move(mu.x + 10, mu.y + 10); await p.mouse.down(); await p.waitForTimeout(450);
+  if (!(await cls()).includes('solo')) fail('a muted part did not solo when held'); await p.mouse.up(); await p.waitForTimeout(100);
+  if (!(await cls()).includes(' on')) fail('the muted part was not muted again after the hold');
   await p.locator('.st .mute').first().tap();
   // Loop acts on touch-down
   const lb = await p.locator('#loopBtn').boundingBox();
