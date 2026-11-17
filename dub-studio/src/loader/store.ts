@@ -1,5 +1,6 @@
 // Where the pieces live: OPFS (songs/<id>/s<stem>/<k>.pcm, plus songs/<id>/meta.json), or memory when OPFS is unavailable.
 import PieceWorker from './worker.ts?worker';
+import ReaderWorker from './reader.worker.ts?worker';
 import type { PieceResult } from './worker';
 import { writeAt, fileAt, list, remove } from '../library/fs';
 import { makeZip, readZip, wavHeader } from '../library/zip';
@@ -36,6 +37,14 @@ async function songDir(songId: string, create = false) {
   return songs.getDirectoryHandle(songId, { create });
 }
 
+// a piece as float channels, read and converted in a worker (playback uses this)
+let reader: Worker | null = null, rid = 1;
+const rwait = new Map<number, (o: Float32Array[] | null) => void>();
+export function readPieceFloat(songId: string, stem: number, k: number, ch: number): Promise<Float32Array[] | null> {
+  if (!reader) { reader = new ReaderWorker(); reader.onmessage = e => { rwait.get(e.data.id)?.(e.data.out); rwait.delete(e.data.id); }; }
+  const m = mem.get(`${songId}/${stem}`), pcm = m && m[k] ? m[k]!.slice() : undefined, id = rid++;
+  return new Promise(ok => { rwait.set(id, ok); reader!.postMessage({ id, path: ['songs', songId, 's' + stem, k + '.pcm'], ch, pcm }, pcm ? [pcm.buffer] : []); });
+}
 export async function readPiece(songId: string, stem: number, k: number): Promise<Int16Array | null> {
   const m = mem.get(`${songId}/${stem}`); if (m && m[k]) return m[k];
   try { const d = await (await songDir(songId)).getDirectoryHandle('s' + stem); const f = await (await d.getFileHandle(k + '.pcm')).getFile(); return new Int16Array(await f.arrayBuffer()); }

@@ -11,7 +11,7 @@ import workletUrl from './rig.worklet.ts?worker&url';
 import { DEFAULT_RIG, type RigParams } from './rig-params';
 import { S, DIVS, HPF, LPF, VLC, VHC } from '../state';
 import { makeIR, shaped, type IR } from './irs';
-import { readPiece, SEG, type StemMeta } from '../loader/store';
+import { readPieceFloat, SEG, type StemMeta } from '../loader/store';
 
 export interface Stem { name: string; meta: StemMeta | null; status?: string }
 export interface Song { id: string; title: string; bpm: number; bpmAuto: boolean; sr: number; gain: number; cues: number[]; stems: Stem[]; count: number }
@@ -172,10 +172,10 @@ const key = (i: number, k: number) => `${song.id}/${i}/${k}`;
 function want(i: number, k: number) {
   const id = key(i, k), sid = song.id; if (cache.has(id) || pend.has(id) || !ctx) return;
   pend.add(id);
-  readPiece(sid, i, k).then(pcm => {
-    pend.delete(id); if (!pcm || !ctx || sid !== song.id) return;
-    const ch = song.stems[i].meta?.ch || 1, n = pcm.length / ch, b = ctx.createBuffer(ch, n, song.sr);
-    for (let c = 0; c < ch; c++) { const d = b.getChannelData(c); for (let j = 0, q = c; j < n; j++, q += ch) d[j] = pcm[q] / 32768; }
+  const ch = song.stems[i].meta?.ch || 1;
+  readPieceFloat(sid, i, k, ch).then(chans => {   // read and converted in a worker; here only a fast copy
+    pend.delete(id); if (!chans || !ctx || sid !== song.id) return;
+    const b = ctx.createBuffer(ch, chans[0].length, song.sr); chans.forEach((d, c) => b.copyToChannel(d as Float32Array<ArrayBuffer>, c));
     cache.set(id, b);
   }, () => pend.delete(id));
 }

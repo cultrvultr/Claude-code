@@ -16,6 +16,11 @@ const fail = m => { console.error('FAIL', m); process.exitCode = 1; };
   const l0 = await layouts(); await p.waitForTimeout(2000); const idle = await layouts() - l0;
   console.log('  layouts in 2 s of untouched playback:', idle);
   if (idle > 8) fail('the idle mixer lays out ' + idle + ' times in 2 s');
+  // playback across piece boundaries never stalls the page (pieces are read and converted in a worker)
+  const gaps = await p.evaluate(() => new Promise(res => { const f = []; let last = performance.now(); const t0 = last;
+    const tick = t => { f.push(t - last); last = t; if (t - t0 < 12000) requestAnimationFrame(tick); else res(f.filter(x => x > 40).length); }; requestAnimationFrame(tick); }));
+  console.log('  frames over 40 ms in 12 s of playback:', gaps);
+  if (gaps > 1) fail('playback stalls the page ' + gaps + ' times in 12 s');
   // Mute: a tap mutes; holding solos only while held, without muting the part first
   const mu = await p.locator('.st .mute').first().boundingBox(), cls = () => p.getAttribute('.st .mute >> nth=0', 'class');
   const lv = () => p.evaluate(async () => { const s = [0, 0, 0, 0]; for (let i = 0; i < 16; i++) { await new Promise(r => setTimeout(r, 50)); window.__dub.meters().ch.slice(0, 4).forEach((v, k) => { s[k] = Math.max(s[k], v); }); } return s; });

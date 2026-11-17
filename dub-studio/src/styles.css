@@ -13,8 +13,10 @@
   --wear: url('/tex/wear.png');
   color-scheme: dark;
 }
-* { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
-html, body { margin: 0; height: 100%; background: var(--bg); color: var(--cream); overscroll-behavior: none; }
+* { box-sizing: border-box; -webkit-tap-highlight-color: transparent; touch-action: none; }   /* no browser gestures: no scroll, bounce, zoom or tap delay */
+.scroll, .scroll * { touch-action: pan-y; }
+input, select, textarea, a, .sheet button { touch-action: manipulation; }
+html, body { margin: 0; height: 100%; background: var(--bg); color: var(--cream); overscroll-behavior: none; position: fixed; inset: 0; width: 100%; overflow: hidden; }
 body { font: 400 calc(13px * var(--z)) / 1.3 var(--mono); user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; overflow: hidden;
   background-image: var(--grain); background-color: var(--bg); }
 button { font: inherit; color: inherit; background: none; border: 0; padding: 0; cursor: pointer; touch-action: manipulation; }
@@ -45,7 +47,7 @@ button { font: inherit; color: inherit; background: none; border: 0; padding: 0;
 
 /* ---- transport ---- */
 .song { display: flex; gap: 10px; align-items: center; flex: none; }
-.play { width: calc(50px * var(--z)); height: calc(50px * var(--z)); flex: none; border-radius: 50%; background: var(--red); display: grid; place-items: center;
+.play { width: calc(clamp(42px, 6vh, 52px) * var(--z)); height: calc(clamp(42px, 6vh, 52px) * var(--z)); flex: none; border-radius: 50%; background: var(--red); display: grid; place-items: center;
   box-shadow: inset 0 -3px 0 rgba(0,0,0,.25), 0 0 0 2px var(--ink); touch-action: none; }
 .play svg { width: 44%; fill: var(--cream); }
 .info { flex: 1; min-width: 0; }
@@ -54,11 +56,11 @@ button { font: inherit; color: inherit; background: none; border: 0; padding: 0;
 #time { font-size: 12px; white-space: nowrap; }
 .prog { position: relative; height: 22px; margin: 2px 0; touch-action: none; }
 .prog::before { content: ''; position: absolute; left: 0; right: 0; top: 9px; height: 4px; background: rgba(43, 32, 21, .25); border-radius: 2px; }
-.prog .pos { position: absolute; left: 0; right: 0; top: 9px; height: 4px; background: var(--ink); border-radius: 2px; transform: scaleX(0); transform-origin: 0 50%; will-change: transform; }
-.prog .posdot { position: absolute; left: -6px; top: 5px; width: 12px; height: 12px; border-radius: 50%; background: var(--red); box-shadow: 0 0 0 2px var(--paper); will-change: transform; }
+.prog .pos { position: absolute; left: 0; right: 0; top: 9px; height: 4px; background: var(--ink); border-radius: 2px; transform: scaleX(0); transform-origin: 0 50%; }
+.prog .posdot { position: absolute; left: -6px; top: 5px; width: 12px; height: 12px; border-radius: 50%; background: var(--red); box-shadow: 0 0 0 2px var(--paper); }
 .prog .band { position: absolute; top: 4px; height: 14px; background: rgba(200, 147, 46, .45); border: 1px dashed var(--ink2); border-radius: 2px; }
 .tools { display: flex; gap: 5px; }
-.tools button { flex: 1; padding: 6px 0; border: 1.5px solid var(--ink); border-radius: 3px; font-size: calc(11px * var(--z)); text-transform: uppercase; letter-spacing: .8px; color: var(--ink); touch-action: none; }
+.tools button { flex: 1; height: calc(clamp(28px, 4vh, 34px) * var(--z)); padding: 0; border: 1.5px solid var(--ink); border-radius: 3px; font-size: calc(11px * var(--z)); text-transform: uppercase; letter-spacing: .8px; color: var(--ink); touch-action: none; }
 .tools button.on { background: var(--gold); }
 .tools button:disabled { opacity: .35; }
 .tools .rec { display: flex; align-items: center; justify-content: center; gap: 4px; }
@@ -85,13 +87,13 @@ button { font: inherit; color: inherit; background: none; border: 0; padding: 0;
 .slot.empty { color: var(--ink2); opacity: .7; }
 .k { display: flex; flex-direction: column; align-items: center; }
 .kv { font-size: calc(10px * var(--z)); text-transform: uppercase; letter-spacing: .6px; color: var(--ink2); white-space: nowrap; height: 13px; }
-.kn, .lvk { width: calc(min(42px, 9.5vw) * var(--z)); height: calc(min(42px, 9.5vw) * var(--z)); touch-action: none; display: block; }
+.kn, .lvk { width: calc(clamp(30px, min(4.8vh, 9.5vw), 42px) * var(--z)); height: calc(clamp(30px, min(4.8vh, 9.5vw), 42px) * var(--z)); touch-action: none; display: block; }
 .k-track { fill: none; stroke: rgba(43, 32, 21, .22); stroke-width: 3; stroke-linecap: round; }
 .k-fill { fill: none; stroke: var(--red); stroke-width: 3; stroke-linecap: round; }
 .k-body { fill: var(--knob); stroke: #0e0a07; stroke-width: 1; }
 .k-cap { fill: var(--knob2); }
 .k-ptr { stroke: var(--cream); stroke-width: 2.2; stroke-linecap: round; }
-.fd { position: relative; flex: 1; width: 100%; min-height: 70px; margin: 4px 0 2px; touch-action: none; }
+.fd { position: relative; flex: 1; width: 100%; min-height: 56px; margin: 4px 0 2px; touch-action: none; }
 .fd .tr { position: absolute; left: 50%; top: 10px; bottom: 10px; width: 6px; margin-left: -3px; background: #1d1610; border-radius: 3px; box-shadow: inset 0 1px 2px #000; }
 .fd .lv { position: absolute; left: 50%; bottom: 10px; width: 6px; margin-left: -3px; background: var(--gold); border-radius: 3px; opacity: .9; transform-origin: 50% 100%; will-change: transform; }
 .fd .mt { position: absolute; right: 3px; top: 10px; bottom: 10px; width: 4px; background: rgba(43,32,21,.18); border-radius: 2px; overflow: hidden; }
@@ -100,7 +102,7 @@ button { font: inherit; color: inherit; background: none; border: 0; padding: 0;
 .fd .cap { will-change: transform; position: absolute; left: 50%; top: 0; width: 70%; max-width: 46px; height: 22px; margin-left: min(-35%, -23px); border-radius: 3px;
   background: linear-gradient(#efe4c9, #c9b68e 45%, #8f7b58 50%, #c9b68e 55%, #e2d4b2); box-shadow: 0 2px 3px rgba(0,0,0,.45), inset 0 0 0 1px rgba(43,32,21,.5); }
 .fd .cap::after { content: ''; position: absolute; left: 10%; right: 10%; top: 10px; height: 2px; background: var(--ink); }
-.throw, .mute { width: 100%; padding: calc(6px * var(--z)) 0; border-radius: 3px; font-size: calc(10.5px * var(--z)); letter-spacing: .8px; text-transform: uppercase; touch-action: none; font-weight: 700; }
+.throw, .mute { flex: none; width: 100%; height: calc(clamp(28px, 4.2vh, 36px) * var(--z)); padding: 0; border-radius: 3px; font-size: calc(10.5px * var(--z)); letter-spacing: .8px; text-transform: uppercase; touch-action: none; font-weight: 700; }
 .throw { border: 1.5px solid var(--ink); color: var(--ink); margin-top: 2px; }
 .throw.on { background: var(--gold); }
 .mute { background: var(--ink); color: var(--cream); }
@@ -109,7 +111,7 @@ button { font: inherit; color: inherit; background: none; border: 0; padding: 0;
 
 /* ---- pads ---- */
 .pads { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; flex: none; }
-.pad { position: relative; display: flex; align-items: center; gap: 8px; padding: 6px 8px 6px 12px; min-height: calc(54px * var(--z)); border-radius: 4px; touch-action: none;
+.pad { position: relative; display: flex; align-items: center; gap: 8px; padding: 4px 8px 4px 12px; min-height: calc(clamp(44px, 6.6vh, 58px) * var(--z)); border-radius: 4px; touch-action: none;
   background: var(--bg2); border: 1.5px solid rgba(239,228,201,.25); background-image: var(--grain); }
 .pad .nm { flex: 1; font: 400 calc(17px * var(--z)) / 1 var(--display); color: var(--cream); }
 .pad .dot { width: 10px; height: 10px; border-radius: 50%; background: #3a2e22; box-shadow: inset 0 0 0 1px rgba(0,0,0,.5); }
@@ -120,12 +122,12 @@ button { font: inherit; color: inherit; background: none; border: 0; padding: 0;
 
 /* ---- echo card and bars ---- */
 .echo { display: grid; grid-template-columns: 1fr 1fr 1fr auto; gap: 10px; align-items: end; flex: none; }
-.bar { position: relative; height: calc(26px * var(--z)); border-radius: 3px; background: rgba(43,32,21,.18); box-shadow: inset 0 0 0 1.5px var(--ink); overflow: hidden; touch-action: none; }
-.bar .fill { position: absolute; left: 0; top: 0; bottom: 0; width: 100%; background: var(--ink); transform: scaleX(0); transform-origin: 0 50%; will-change: transform; }
+.bar { position: relative; height: calc(clamp(28px, 4.4vh, 38px) * var(--z)); border-radius: 3px; background: rgba(43,32,21,.18); box-shadow: inset 0 0 0 1.5px var(--ink); overflow: hidden; touch-action: none; }
+.bar .fill { position: absolute; left: 0; top: 0; bottom: 0; width: 100%; background: var(--ink); transform: scaleX(0); transform-origin: 0 50%; }
 .bar.hot .fill { background: var(--red); }
 .bar.bi .c { position: absolute; top: 0; bottom: 0; background: var(--green); }
 .bar.bi .mid { position: absolute; left: 50%; top: 0; bottom: 0; width: 2px; margin-left: -1px; background: var(--ink); }
-.tap { width: calc(52px * var(--z)); height: calc(42px * var(--z)); border-radius: 3px; background: var(--green); color: var(--cream); display: flex; flex-direction: column; align-items: center; justify-content: center; line-height: 1; touch-action: none; }
+.tap { width: calc(52px * var(--z)); height: calc(clamp(34px, 5vh, 42px) * var(--z)); border-radius: 3px; background: var(--green); color: var(--cream); display: flex; flex-direction: column; align-items: center; justify-content: center; line-height: 1; touch-action: none; }
 .tap span { font-size: 10px; text-transform: uppercase; letter-spacing: 1px; } .tap b { font-size: 15px; }
 .tap.on { background: var(--gold); color: var(--ink); }
 
@@ -247,33 +249,24 @@ button { font: inherit; color: inherit; background: none; border: 0; padding: 0;
 
 /* ---- feel: instant pressed states, the value bubble ---- */
 .pressed { transition: none !important; }
-.play.pressed { transform: scale(.94); filter: brightness(1.12); }
-.tools button.pressed, .throw.pressed, .slot.pressed, .seg i.pressed, .snaps i.pressed, .banks i.pressed, .tabs button.pressed, .tap.pressed, .big.pressed { filter: brightness(.82); transform: translateY(1px); }
-.mute.pressed { filter: brightness(1.25); transform: translateY(1px); }
+.play.pressed { transform: scale(.94); background: #b8462f; }
+.tools button.pressed, .throw.pressed, .slot.pressed, .seg i.pressed, .snaps i.pressed, .banks i.pressed, .tabs button.pressed, .tap.pressed, .big.pressed { background-color: rgba(43,32,21,.16); transform: translateY(1px); }
+.mute.pressed { background: #4a3a2a; transform: translateY(1px); }
+.mute.on.pressed { background: #b8462f; } .mute.solo.pressed { background: #67833f; }
 .pad.pressed { background-color: #2e2318; transform: scale(.985); }
 .kn.pressed .k-cap, .lvk.pressed .k-cap { fill: #5a4836; }
 .kn.pressed .k-fill, .lvk.pressed .k-fill { stroke: #c4502f; }
-.fd.pressed .cap { filter: brightness(1.08); box-shadow: 0 3px 6px rgba(0,0,0,.55), inset 0 0 0 1px rgba(43,32,21,.6); }
+.fd.pressed .cap { box-shadow: 0 3px 6px rgba(0,0,0,.55), inset 0 0 0 1px rgba(43,32,21,.6); }
 .bubble { position: fixed; left: 0; top: 0; z-index: 85; pointer-events: none; background: var(--ink); color: var(--cream); font: 700 13px/1 var(--mono); padding: 6px 8px; border-radius: 4px;
   box-shadow: 0 4px 10px rgba(0,0,0,.45); white-space: nowrap; will-change: transform; }
 
 /* ---- short screens (iPhone SE, mini, landscape iPad split): everything a little tighter so the strips fit ---- */
-@media (max-height: 760px) {
-  #app { gap: 5px; }
-  .brand { font-size: 18px; white-space: nowrap; }
-  .tabs button { padding: 6px 7px; font-size: 11px; }
-  .play { width: 42px; height: 42px; }
-  .song { padding: 6px 9px; } .tools button { padding: 4px 0; } .prog { height: 18px; }
-  .snaps i { padding: 4px 0; width: 30px; font-size: 13px; }
-  .st { padding: 4px 3px; gap: 0; }
-  .kn { width: min(34px, 8.5vw); height: min(34px, 8.5vw); }
-  .kv { font-size: 9px; height: 11px; }
-  .fd { min-height: 44px; margin: 2px 0 1px; }
-  .throw, .mute { padding: 4px 0; font-size: 10px; }
-  .pad { min-height: 42px; padding: 4px 8px; } .pad .nm { font-size: 15px; } .lvk { width: 32px; height: 32px; }
-  .echo { padding: 6px 9px; gap: 8px; } .bar { height: 20px; } .tap { height: 34px; width: 46px; }
+@media (max-height: 600px) {   /* iPhone SE and similar in Safari */
+  #app { gap: 5px; } .brand { font-size: 18px; white-space: nowrap; } .song { padding: 6px 9px; } .prog { height: 18px; }
+  .snaps i { padding: 4px 0; width: 30px; font-size: 13px; } .st { padding: 4px 3px; gap: 0; }
+  .kn { width: 28px; height: 28px; } .kv { font-size: 8.5px; height: 10px; letter-spacing: .3px; } .fd { min-height: 40px; margin: 2px 0 1px; }
+  .echo { padding: 6px 9px; gap: 8px; }
 }
-@media (max-height: 640px) { .kn { width: 30px; height: 30px; } .kv { font-size: 8.5px; height: 10px; letter-spacing: .3px; } }
 @media (max-width: 380px) { .brand { font-size: 17px; } .tabs button { padding: 6px 6px; letter-spacing: .5px; } }
 
 /* ---- bank swipe ---- */
