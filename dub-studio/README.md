@@ -21,13 +21,36 @@ Connect this GitHub repo in Cloudflare Pages with:
 
 `public/_headers` sets COOP/COEP for the stem splitter (Phase 3).
 
-## What's in Phase 1 so far
+## What's built
 
-- Mixer: 4 strips (stepped Cut, Echo, Verb, fader with meter, Throw, Mute with hold-to-kill), Siren and Synare pads with level knobs, echo Time / Repeats / Return, tap tempo.
-- Transport: play, seek, 4-bar loop, undo, reset (hold), record and share.
-- FX page: Echo (Sync/Free, note lengths, Mono/Stereo/Ping-pong, tone, echo to verb, instrument dry/wet) and Verb (5 reverbs, decay with envelope, low/high cut, return).
-- Synare page (XY pad, second finger wobble) and Siren page (Base, Mode, Beat, Trig toggle/hold, Signal, Swoop).
-- Demo riddim generated in the browser. Load your own files per slot or 4 at once.
-- iPhone: plays with the silent switch on, wake lock, lock-screen controls, resume after interruption, Bluetooth delay notice, Add to Home Screen hint, landscape overlay.
+**Studio (Phase 1)**
+- Mixer with 4 to 8 channels (banks 1–4 / 5–8 on phones): stepped Cut, Echo, Verb, fader with meter, Throw (hold), Mute (tap) / Solo (hold, green).
+- Siren and Synare pads, echo Time / Repeats / Return, tap tempo.
+- Transport: play, seek, 4-bar loop, cues (hold Loop), undo, reset (hold), record and share.
+- Mix snapshots A–D (hold to store, tap to recall). Guided tour. Works offline after the first visit.
+- FX page (echo and verb in detail), Synare XY pad, Siren page.
+
+**Track loader (Phase 2)**
+- Load 1 to 8 files; names like `drums`, `bass`, `vocals`, `guitar`, `keys`, `sax` go to their home channels.
+- Each part is cut into 10 s pieces of 16-bit PCM in the browser's private storage (OPFS); only the pieces near the playhead are in memory. Mono parts are stored mono.
+- Tempo found from the drums; one loudness trim for the whole song; per-part Nudge (ms); waveforms.
+
+**Stem splitter (Phase 3)**
+- htdemucs_6s (MIT) in the browser via ONNX Runtime Web: WebGPU, or WebAssembly without a GPU.
+- Six parts: Drums, Bass, Other, Vocals, Guitar, Keys. The 285 MB model downloads once and stays on the device.
+- `scripts/prepare-assets.mjs` fetches the pinned model, checks its SHA-256 and splits it into 20 MB parts at build time.
+
+**Library (Phase 4)**
+- Every song is kept with its own mix, A–D, cues and takes. Open, export (.zip), import, delete.
+- Any part shares as a WAV. Recorded takes are saved per song.
+
+## Tests
+
+```bash
+npm run build && npm run preview   # then, in another shell:
+npm run test:e2e                   # smoke, channels, phase1, loader, library
+npm run test:split                 # the splitter end to end (downloads the model; slow on CPU)
+```
 
 All DSP, reverbs and the demo song are written for this project (CC0). Fonts: Shrikhand and Courier Prime (SIL OFL).
+Thanks to Kibir La Amlak's [4 Track Pocket Dub Studio](https://www.kibir-la-amlak.com/dubstudio/) for the idea and concept.

@@ -1,11 +1,14 @@
 // Where the pieces live: OPFS (songs/<id>/s<stem>/<k>.pcm, plus songs/<id>/meta.json), or memory when OPFS is unavailable.
 import PieceWorker from './worker.ts?worker';
 import type { PieceResult } from './worker';
+import { writeAt, fileAt, list, remove } from '../library/fs';
+import { makeZip, readZip, wavHeader } from '../library/zip';
 
 export const SEG = 10;   // seconds per piece
 
 export interface StemMeta { name: string; n: number; ch: number; dur: number; peaks: number[]; ms: number; offset: number; file?: string }
-export interface SongMeta { id: string; title: string; bpm: number; bpmAuto?: boolean; sr: number; seg: number; gain: number; stems: (StemMeta | null)[]; cues: number[]; created: number; played?: number }
+export interface SongMeta { id: string; title: string; bpm: number; bpmAuto?: boolean; sr: number; seg: number; gain: number; stems: (StemMeta | null)[]; cues: number[]; created: number; played?: number;
+  mix?: unknown; snaps?: (string | null)[]; source?: 'files' | 'split' | 'demo' }
 
 const mem = new Map<string, (Int16Array | null)[]>();   // `${songId}/${stem}` -> pieces OPFS could not take (null: that one is in OPFS)
 export function adoptPieces(songId: string, stem: number, pieces: (Int16Array | null)[]) { mem.set(`${songId}/${stem}`, pieces); }
@@ -40,16 +43,13 @@ export async function readPiece(songId: string, stem: number, k: number): Promis
 }
 
 export async function saveMeta(meta: SongMeta) {
-  try {
-    const d = await songDir(meta.id, true), fh = await d.getFileHandle('meta.json', { create: true });
-    const wr = await (fh as FileSystemFileHandle & { createWritable?: () => Promise<FileSystemWritableFileStream> }).createWritable?.();
-    if (wr) { await wr.write(JSON.stringify(meta)); await wr.close(); return; }
-  } catch { /* no OPFS writes from the page (older Safari): kept in localStorage below */ }
+  try { await writeAt(['songs', meta.id, 'meta.json'], JSON.stringify(meta)); return; } catch { /* no OPFS: kept in localStorage */ }
   try { localStorage.setItem('dub-studio-meta-' + meta.id, JSON.stringify(meta)); } catch { /* full */ }
 }
 export async function loadMeta(id: string): Promise<SongMeta | null> {
-  try { const f = await (await (await songDir(id)).getFileHandle('meta.json')).getFile(); return JSON.parse(await f.text()); }
-  catch { try { return JSON.parse(localStorage.getItem('dub-studio-meta-' + id) || 'null'); } catch { return null; } }
+  const f = await fileAt(['songs', id, 'meta.json']);
+  if (f) try { return JSON.parse(await f.text()); } catch { /* bad file */ }
+  try { return JSON.parse(localStorage.getItem('dub-studio-meta-' + id) || 'null'); } catch { return null; }
 }
 export async function listSongs(): Promise<SongMeta[]> {
   const out: SongMeta[] = [];
@@ -62,7 +62,55 @@ export async function listSongs(): Promise<SongMeta[]> {
 export async function deleteSong(id: string) {
   for (const k of [...mem.keys()]) if (k.startsWith(id + '/')) mem.delete(k);
   try { localStorage.removeItem('dub-studio-meta-' + id); } catch { /* */ }
-  try { const root = await navigator.storage.getDirectory(), songs = await root.getDirectoryHandle('songs'); await songs.removeEntry(id, { recursive: true }); } catch { /* gone */ }
+  await remove(['songs', id]); await remove(['takes', id]);
+}
+
+// ---------- a stem as a WAV file (header + its pieces, read lazily) ----------
+async function pieceBlob(id: string, stem: number, k: number): Promise<Blob | null> {
+  const m = mem.get(`${id}/${stem}`); if (m && m[k]) return new Blob([m[k] as Int16Array<ArrayBuffer>]);
+  return fileAt(['songs', id, 's' + stem, k + '.pcm']);
+}
+export async function stemWav(meta: SongMeta, stem: number): Promise<Blob> {
+  const st = meta.stems[stem]; if (!st) throw new Error('empty track');
+  const parts: Blob[] = []; let bytes = 0;
+  for (let k = 0; k < st.n; k++) { const b = await pieceBlob(meta.id, stem, k); if (!b) throw new Error('missing audio'); parts.push(b); bytes += b.size; }
+  return new Blob([wavHeader(bytes / (2 * st.ch), st.ch, meta.sr), ...parts], { type: 'audio/wav' });
+}
+
+// ---------- export / import a whole song (meta + pieces) ----------
+export async function exportSong(meta: SongMeta, onFile?: (i: number, n: number) => void): Promise<Blob> {
+  const entries: { name: string; data: Blob }[] = [{ name: 'meta.json', data: new Blob([JSON.stringify(meta)]) }];
+  for (let i = 0; i < meta.stems.length; i++) { const st = meta.stems[i]; if (!st) continue;
+    for (let k = 0; k < st.n; k++) { const b = await pieceBlob(meta.id, i, k); if (!b) throw new Error('missing audio'); entries.push({ name: `s${i}/${k}.pcm`, data: b }); } }
+  return makeZip(entries, i => onFile?.(i, entries.length));
+}
+export async function importSong(zip: Blob, onFile?: (i: number, n: number) => void): Promise<SongMeta> {
+  const files = await readZip(zip), mf = files.find(f => f.name === 'meta.json'); if (!mf) throw new Error('not a Dub Studio song');
+  const meta = JSON.parse(await mf.data.text()) as SongMeta;
+  if (!meta.stems || !meta.sr) throw new Error('not a Dub Studio song');
+  meta.id = newSongId(); meta.played = Date.now();   // always a new copy
+  let i = 0;
+  for (const f of files) { if (/^s\d\/\d+\.pcm$/.test(f.name)) { const [s, k] = f.name.split('/'); await writeAt(['songs', meta.id, s, k], f.data); } onFile?.(++i, files.length); }
+  await saveMeta(meta); return meta;
+}
+
+// ---------- recorded takes, kept per song ----------
+export interface Take { song: string; name: string; size: number; when: number }
+export async function saveTake(songId: string, blob: Blob): Promise<string> {
+  const ext = blob.type.includes('mp4') ? 'm4a' : blob.type.includes('webm') ? 'webm' : 'wav', name = `${Date.now()}.${ext}`;
+  await writeAt(['takes', songId || 'none', name], blob); return name;
+}
+export async function listTakes(songId: string): Promise<Take[]> {
+  const names = await list(['takes', songId]), out: Take[] = [];
+  for (const n of names) { const f = await fileAt(['takes', songId, n]); if (f) out.push({ song: songId, name: n, size: f.size, when: +n.split('.')[0] || f.lastModified }); }
+  return out.sort((a, b) => b.when - a.when);
+}
+export const takeFile = (t: Take) => fileAt(['takes', t.song, t.name]);
+export const deleteTake = (t: Take) => remove(['takes', t.song, t.name]);
+
+export async function storageUse(): Promise<{ used: number; quota: number; persisted: boolean }> {
+  const e = await navigator.storage.estimate().catch(() => ({ usage: 0, quota: 0 })), p = await navigator.storage.persisted?.().catch(() => false);
+  return { used: e.usage || 0, quota: e.quota || 0, persisted: !!p };
 }
 export const inMemory = (songId: string) => [...mem.keys()].some(k => k.startsWith(songId + '/'));
 export function forgetMemory(songId: string) { for (const k of [...mem.keys()]) if (k.startsWith(songId + '/')) mem.delete(k); }

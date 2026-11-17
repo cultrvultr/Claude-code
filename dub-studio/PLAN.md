@@ -192,6 +192,13 @@ Goal: drop in one full mix, get 4 stems in the 4 slots.
 - Perf budget: app shell <150 KB gzipped (excluding model and IRs).
 - Test matrix: iOS Safari (latest −1), Android Chrome, desktop Chrome/Firefox/Safari.
 
+## Status (Nov 2026)
+
+All four phases are built and tested on an emulated iPhone: studio, track loader, stem splitter, library.
+Changes along the way: up to 8 channels (banks of 4 on phones), long-press Mute = Solo (green), credit to the original in Help,
+reverbs synthesised in code (CC0) until recorded CC0 IRs are chosen, and the splitter uses htdemucs_6s (6 parts, not 4).
+Still to check on a real iPhone: WebGPU speed of the splitter, memory on long songs, lock-screen behaviour.
+
 ## 6. Decisions
 1. **Hosting: Cloudflare Pages**, deployed from this GitHub repo on every push. Free, HTTPS, global CDN, and a `_headers` file sets COOP/COEP. Fallback: GitHub Pages with the `coi-serviceworker` shim to add those headers.
 2. **Reverb IRs: CC0** for now (e.g. OpenAIR CC0 sets, Voxengo free IRs where the licence allows). Licence recorded per IR in `assets/irs/LICENSES.md`.

@@ -229,3 +229,17 @@ button { font: inherit; color: inherit; background: none; border: 0; padding: 0;
 .splitstat { margin: 8px 0 0; font-weight: 700; }
 #splitBar .fill { background: var(--green); transition: width .3s; }
 #goSplit { font-size: 17px; }
+
+/* ---- library ---- */
+.libbtn { margin-left: auto; margin-right: 6px; border: 1.5px solid var(--ink); border-radius: 3px; padding: 6px 10px; font-weight: 700; font-size: 12px; text-transform: uppercase; letter-spacing: .8px; color: var(--ink); }
+.libh { font: 400 18px/1 var(--display); color: var(--red); margin: 18px 0 6px; }
+.lib-item { padding: 10px 0; border-bottom: 1px dashed rgba(43,32,21,.35); }
+.lib-item .t { font: 400 17px/1.2 var(--display); color: var(--ink); }
+.lib-item .t small { font: 700 10px/1 var(--mono); color: var(--cream); background: var(--green); padding: 2px 5px; border-radius: 2px; vertical-align: middle; margin-left: 6px; }
+.lib-item .s { font-size: 12px; color: var(--ink2); margin: 3px 0 7px; }
+.lib-item .b { display: flex; gap: 6px; }
+.lib-item .b button { flex: 1; border: 1.5px solid var(--ink); border-radius: 3px; padding: 7px 4px; font-weight: 700; font-size: 11px; text-transform: uppercase; letter-spacing: .6px; color: var(--ink); }
+.lib-item .b button.go1 { background: var(--ink); color: var(--paper); }
+.lib-item .b button.warn { background: var(--red); color: var(--cream); border-color: var(--red); }
+.lib-item audio { width: 100%; margin-top: 6px; }
+.slotrow .wv .share { border: 1.5px solid var(--ink); border-radius: 3px; padding: 4px 7px; font-size: 10px; font-weight: 700; text-transform: uppercase; color: var(--ink); }

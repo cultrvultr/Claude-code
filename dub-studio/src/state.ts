@@ -58,20 +58,18 @@ export function resetMix() { gestureStart(); S.ch.forEach(c => Object.assign(c, 
 let onUndoChange = () => {};
 export function watchUndo(fn: () => void) { onUndoChange = fn; }
 
-// ---------- mix snapshots A-D: hold to store, tap to recall ----------
-const SNAP_KEY = 'dub-studio-snaps-v1';
+// ---------- mix snapshots A-D: hold to store, tap to recall (kept with each song; see main.ts) ----------
 let snaps: (string | null)[] = [null, null, null, null];
-try { const j = JSON.parse(localStorage.getItem(SNAP_KEY) || 'null'); if (Array.isArray(j)) snaps = j.slice(0, 4).concat([null, null, null, null]).slice(0, 4); } catch { /* */ }
 export let lastSnap = -1;
 export const hasSnap = (i: number) => !!snaps[i];
-export function storeSnap(i: number) {
-  snaps[i] = JSON.stringify({ ch: S.ch.map(c => ({ ...c, solo: false })), m: S.m }); lastSnap = i;
-  try { localStorage.setItem(SNAP_KEY, JSON.stringify(snaps)); } catch { /* */ }
-}
-export function recallSnap(i: number): boolean {
-  const j = snaps[i]; if (!j) return false;
-  gestureStart();
+export const getSnaps = () => snaps.slice();
+export function setSnaps(a: (string | null)[] | undefined) { snaps = (a || []).slice(0, 4).concat([null, null, null, null]).slice(0, 4); lastSnap = -1; }
+export function storeSnap(i: number) { snaps[i] = JSON.stringify({ ch: S.ch.map(c => ({ ...c, solo: false })), m: S.m }); lastSnap = i; onUndoChange(); }
+function applyJson(j: string) {
   const o = JSON.parse(j) as State; o.ch.forEach((c, k) => { if (S.ch[k]) Object.assign(S.ch[k], c); });
   Object.assign(S.m, o.m, { sir: { ...S.m.sir, ...o.m.sir }, syn: { ...S.m.syn, ...o.m.syn } });
-  lastSnap = i; gestureEnd(); return true;
 }
+export function recallSnap(i: number): boolean { const j = snaps[i]; if (!j) return false; gestureStart(); applyJson(j); lastSnap = i; gestureEnd(); return true; }
+// a song's own mix, when it is opened again
+export const mixJson = () => JSON.stringify({ ch: S.ch.map(c => ({ ...c, solo: false })), m: S.m });
+export function setMix(j: unknown) { if (typeof j === 'string') try { applyJson(j); save(); } catch { /* old or bad */ } }
