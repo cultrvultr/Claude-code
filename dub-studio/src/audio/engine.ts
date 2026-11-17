@@ -11,9 +11,10 @@ import workletUrl from './rig.worklet.ts?worker&url';
 import { DEFAULT_RIG, type RigParams } from './rig-params';
 import { S, DIVS, HPF, LPF, VLC, VHC } from '../state';
 import { makeIR, shaped, type IR } from './irs';
+import { readPiece, SEG, type StemMeta } from '../loader/store';
 
-export interface Stem { name: string; buffer: AudioBuffer | null; file?: string }
-export interface Song { title: string; bpm: number; stems: Stem[]; count: number }
+export interface Stem { name: string; meta: StemMeta | null; status?: string }
+export interface Song { id: string; title: string; bpm: number; bpmAuto: boolean; sr: number; gain: number; cues: number[]; stems: Stem[]; count: number }
 export const N = 8;   // channels on the desk; the strips show song.count of them
 export const DEFAULT_NAMES = ['Drums', 'Bass', 'Other', 'Vocals', 'Guitar', 'Keys', 'Horns', 'FX'];
 
@@ -25,7 +26,7 @@ const T9 = { lp: 0.713, hp: 1 / 0.713, q: 2.55, far: 16.8 };   // stepped-filter
 interface Ch { inp: GainNode; hp1: BiquadFilterNode; hp2: BiquadFilterNode; lp1: BiquadFilterNode; lp2: BiquadFilterNode;
   clean: GainNode; crunch: GainNode; fader: GainNode; mute: GainNode; solo: GainNode; echo: GainNode; throwG: GainNode; verb: GainNode; meter: AnalyserNode }
 
-export const song: Song = { title: '', bpm: 75, count: 4, stems: DEFAULT_NAMES.map(name => ({ name, buffer: null })) };
+export const song: Song = { id: '', title: '', bpm: 75, bpmAuto: true, sr: 48000, gain: 1, cues: [], count: 4, stems: DEFAULT_NAMES.map(name => ({ name, meta: null })) };
 export let ctx: AudioContext | null = null;
 let master: GainNode, limiter: DynamicsCompressorNode, masterMeter: AnalyserNode;
 let echoBus: GainNode, echoRet: GainNode, echoVerb: GainNode, verbIn: GainNode, conv: ConvolverNode, vLc: BiquadFilterNode, vHc: BiquadFilterNode, vRet: GainNode;
@@ -151,42 +152,101 @@ const tmp = new Float32Array(512);
 function peak(a: AnalyserNode) { a.getFloatTimeDomainData(tmp); let p = 0; for (let i = 0; i < tmp.length; i++) { const v = Math.abs(tmp[i]); if (v > p) p = v; } return p; }
 export function meters(): { ch: number[]; master: number } | null { if (!ctx || !ch.length) return null; return { ch: ch.map(c => peak(c.meter)), master: peak(masterMeter) }; }
 
-// ---------- transport: whole buffers for now (Phase 2 swaps in the piece player) ----------
-export const dur = () => Math.max(0, ...song.stems.map(s => s.buffer ? s.buffer.duration : 0));
-let srcs: { s: AudioBufferSourceNode; g: GainNode }[] = [];
-let t0 = 0, pos0 = 0;
-export let playing = false;
+// ---------- transport: the piece player ----------
+// Each stem is stored as 10 s pieces. Pieces are read and turned into AudioBuffers just ahead of the playhead and
+// scheduled back to back, sample-exact (they are cut from one timeline, so no crossfade is needed). Only the pieces
+// around the playhead (and the loop) stay in memory. A breakpoint list maps context time to song time, through loops and seeks.
+const LOOK = 1.5;
 export const loop = { on: false, a: 0, b: 0 };
+export let playing = false;
+let pos0 = 0, schedSong = 0, schedCtx = 0, timer = 0, gen = 0;
+let bps: { ctx: number; song: number }[] = [];
+let sess: GainNode[] = [], srcs: AudioBufferSourceNode[] = [];
+const cache = new Map<string, AudioBuffer>(), pend = new Set<string>();
+const off = (i: number) => (song.stems[i].meta?.offset || 0) / 1000;
+const live = () => song.stems.map((s, i) => i < song.count && s.meta ? i : -1).filter(i => i >= 0);
+export const dur = () => Math.max(0, ...live().map(i => song.stems[i].meta!.dur + off(i)));
+const loopOn = () => loop.on && loop.b > loop.a;
+const key = (i: number, k: number) => `${song.id}/${i}/${k}`;
+
+function want(i: number, k: number) {
+  const id = key(i, k), sid = song.id; if (cache.has(id) || pend.has(id) || !ctx) return;
+  pend.add(id);
+  readPiece(sid, i, k).then(pcm => {
+    pend.delete(id); if (!pcm || !ctx || sid !== song.id) return;
+    const ch = song.stems[i].meta?.ch || 1, n = pcm.length / ch, b = ctx.createBuffer(ch, n, song.sr);
+    for (let c = 0; c < ch; c++) { const d = b.getChannelData(c); for (let j = 0, q = c; j < n; j++, q += ch) d[j] = pcm[q] / 32768; }
+    cache.set(id, b);
+  }, () => pend.delete(id));
+}
+// the pieces of stem i that cover song time [a, b)
+function piecesFor(i: number, a: number, b: number): number[] {
+  const m = song.stems[i].meta!, o = off(i), ta = Math.max(0, a - o), tb = Math.min(m.dur, b - o), out: number[] = [];
+  if (tb <= ta) return out;
+  for (let k = Math.floor(ta / SEG); k * SEG < tb && k < m.n; k++) out.push(k);
+  return out;
+}
+function pump(g: number) {
+  if (!ctx || g !== gen || !playing) return;
+  const d = dur(), t = ctx.currentTime;
+  if (schedCtx < t + 0.01) { schedCtx = t + 0.06; bps.push({ ctx: schedCtx, song: schedSong }); }   // a piece was late: carry on from here
+  while (schedCtx < t + LOOK) {
+    if (schedSong >= d - 1e-6 && !(loopOn() && schedSong < loop.b)) break;   // the end: nothing more to line up
+    let end = Math.min(d, (Math.floor(schedSong / SEG + 1e-9) + 1) * SEG);
+    if (loopOn() && schedSong < loop.b) end = Math.min(end, loop.b);
+    if (end - schedSong < 1e-6) { schedSong = end; continue; }
+    const lv = live(); let ready = true;
+    for (const i of lv) for (const k of piecesFor(i, schedSong, end)) if (!cache.has(key(i, k))) { want(i, k); ready = false; }
+    if (!ready) break;   // wait for the pieces; the next pump lines them up
+    for (const i of lv) {
+      const o = off(i);
+      for (const k of piecesFor(i, schedSong, end)) {
+        const buf = cache.get(key(i, k))!, ps = k * SEG, p0 = Math.max(ps, schedSong - o), p1 = Math.min(ps + buf.duration, end - o);
+        if (p1 - p0 < 1e-6) continue;
+        const s = ctx.createBufferSource(); s.buffer = buf; s.connect(sess[i]);
+        s.start(schedCtx + (p0 + o - schedSong), p0 - ps, p1 - p0);
+        srcs.push(s); s.onended = () => { const j = srcs.indexOf(s); if (j >= 0) srcs.splice(j, 1); };
+      }
+    }
+    schedCtx += end - schedSong; schedSong = end;
+    if (loopOn() && Math.abs(schedSong - loop.b) < 1e-6) { schedSong = loop.a; bps.push({ ctx: schedCtx, song: loop.a }); }
+  }
+  // read ahead two pieces; forget pieces away from the playhead and the loop
+  const lv = live(), nowS = now(); for (const i of lv) for (const k of piecesFor(i, schedSong, schedSong + 2 * SEG)) want(i, k);
+  if (loopOn()) for (const i of lv) for (const k of piecesFor(i, loop.a, Math.min(loop.a + SEG, loop.b))) want(i, k);
+  for (const id of [...cache.keys()]) {
+    const [sid, si, sk] = id.split('/'), k = +sk, i = +si; if (sid !== song.id) { cache.delete(id); continue; }
+    const st = (k * SEG + off(i)), en = st + SEG, keep = (en > nowS - 2 && st < schedSong + 2.5 * SEG) || (loopOn() && en > loop.a && st < loop.b);
+    if (!keep) cache.delete(id);
+  }
+  if (bps.length > 64) bps = bps.slice(-32);
+}
 export function now(): number {
-  if (!playing || !ctx) return pos0;
-  let t = pos0 + (ctx.currentTime - t0);
-  if (loop.on && loop.b > loop.a && pos0 < loop.b && t >= loop.b) t = loop.a + (t - loop.b) % (loop.b - loop.a);
-  return Math.min(t, dur());
+  if (!playing || !ctx || !bps.length) return pos0;
+  const t = ctx.currentTime; let bp = bps[0]; for (const b of bps) { if (b.ctx <= t) bp = b; else break; }
+  return Math.min(dur(), bp.song + Math.max(0, t - bp.ctx));
 }
 export function play(at = pos0) {
-  if (!ctx) return; stopSources(); const d = dur(); if (!d) return;
-  if (at >= d - 0.05) at = 0;
-  pos0 = at; t0 = ctx.currentTime + 0.05;
-  for (let i = 0; i < N; i++) {
-    const b = song.stems[i].buffer; if (!b) continue;
-    const s = ctx.createBufferSource(), g = ctx.createGain(); s.buffer = b;
-    if (loop.on && loop.b > loop.a && at < loop.b) { s.loop = true; s.loopStart = loop.a; s.loopEnd = Math.min(loop.b, b.duration); }
-    g.gain.setValueAtTime(0, t0); g.gain.linearRampToValueAtTime(1, t0 + 0.012);   // no click on a mid-song start
-    s.connect(g); g.connect(ch[i].inp); s.start(t0, Math.min(at, b.duration));
-    srcs.push({ s, g });
-  }
-  playing = true;
+  if (!ctx || !dur()) return; stopSources();
+  const d = dur(); if (at >= d - 0.05) at = 0;
+  const g = ++gen; pos0 = at; schedSong = at; schedCtx = ctx.currentTime + 0.08; bps = [{ ctx: schedCtx, song: at }];
+  sess = ch.map(c => { const s = ctx!.createGain(); s.gain.setValueAtTime(0, schedCtx); s.gain.linearRampToValueAtTime(song.gain, schedCtx + 0.012); s.connect(c.inp); return s; });
+  playing = true; pump(g); clearInterval(timer); timer = window.setInterval(() => pump(g), 100);
 }
 function stopSources() {
-  if (!ctx) return; const n = ctx.currentTime;
-  for (const { s, g } of srcs) { try { g.gain.cancelScheduledValues(n); g.gain.setValueAtTime(g.gain.value, n); g.gain.linearRampToValueAtTime(0, n + 0.012); s.stop(n + 0.02); } catch { /* already stopped */ } }
-  srcs = [];
+  if (!ctx) return; const n = ctx.currentTime; gen++; clearInterval(timer);
+  for (const s of sess) { s.gain.cancelScheduledValues(n); s.gain.setValueAtTime(s.gain.value, n); s.gain.linearRampToValueAtTime(0, n + 0.012); }
+  for (const s of srcs) { try { s.stop(n + 0.02); } catch { /* not started */ } }
+  const old = sess; setTimeout(() => old.forEach(x => x.disconnect()), 100);
+  srcs = []; sess = [];
 }
 export function stop() { pos0 = now(); stopSources(); playing = false; }
 export function seek(t: number) { const d = dur(); t = Math.max(0, Math.min(d, t)); if (playing) play(t); else pos0 = t; }
-export function relooped() { if (playing) play(now()); }   // loop points changed: restart the sources from here
-export const ended = () => playing && !loop.on && now() >= dur() - 0.01;
+export function relooped() { if (playing) play(now()); }   // loop points changed: line up again from here
+export const ended = () => playing && !loopOn() && now() >= dur() - 0.02;
 export function rewind() { pos0 = 0; }
+export function songChanged() { cache.clear(); pend.clear(); }
+export function setSongGain(g: number) { song.gain = g; if (ctx) for (const s of sess) ramp(s.gain, g, 0.05); }
 
 // ---------- record the master ----------
 let recDest: MediaStreamAudioDestinationNode | null = null, rec: MediaRecorder | null = null, chunks: Blob[] = [];
@@ -206,8 +266,5 @@ export function recStop(): Promise<Blob | null> {
 export async function decodeFile(f: Blob): Promise<AudioBuffer> {
   await ensure(); const ab = await f.arrayBuffer();
   return await new Promise((ok, no) => ctx!.decodeAudioData(ab, ok, no));
-}
-export function bufferFrom(data: Float32Array<ArrayBuffer>): AudioBuffer {
-  const b = ctx!.createBuffer(1, data.length, ctx!.sampleRate); b.copyToChannel(data, 0); return b;
 }
 export const latency = () => ctx ? (ctx.baseLatency || 0) + ((ctx as AudioContext & { outputLatency?: number }).outputLatency || 0) : 0;

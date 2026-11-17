@@ -9,7 +9,8 @@ const fail = m => { console.error('FAIL', m); process.exitCode = 1; };
   const errs = []; p.on('pageerror', e => errs.push(e.message)); p.on('console', m => { if (m.type() === 'error') errs.push(m.text()); });
   const peak = () => p.evaluate(async () => { let x = 0; for (let i = 0; i < 10; i++) { await new Promise(r => setTimeout(r, 50)); x = Math.max(x, window.__dub.meters().master); } return x; });
   await p.addInitScript(() => localStorage.setItem('dub-studio-toured', '1'));   // the tour has its own test
-  await p.goto(URL); await p.tap('#goDemo'); await p.waitForTimeout(8000);   // past bar 2, where kick and bass come in
+  await p.goto(URL); await p.tap('#goDemo');
+  await p.waitForFunction(() => { const m = /^0:(\d\d)/.exec(document.getElementById('time').textContent); return m && +m[1] >= 8; }, null, { timeout: 30000 });   // past bar 2, where kick and bass come in
   if ((await p.getAttribute('#play', 'aria-label')) !== 'Pause') fail('demo did not start');
   if (await peak() < 0.05) fail('no sound from the demo');
   await p.tap('#play'); await p.waitForTimeout(2500);

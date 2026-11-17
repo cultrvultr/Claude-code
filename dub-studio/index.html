@@ -28,7 +28,7 @@
     <button class="play" id="play" aria-label="Play"><svg viewBox="0 0 20 20" id="playIcon"><path d="M5 3l12 7-12 7z"/></svg></button>
     <div class="info">
       <div class="row1"><button class="title link" id="songBtn"></button><b id="time">0:00 / 0:00</b></div>
-      <div class="prog" id="prog" role="slider" aria-label="Song position"><i class="band" id="band"></i><i class="pos" id="pos"></i></div>
+      <div class="prog" id="prog" role="slider" aria-label="Song position"><div id="progWave" aria-hidden="true"></div><i class="band" id="band"></i><i class="pos" id="pos"></i></div>
       <div class="tools">
         <button id="loopBtn" aria-pressed="false">Loop</button>
         <button id="undoBtn">Undo</button>
@@ -126,6 +126,7 @@
     <div class="lfds" aria-hidden="true"><div class="lfd"><i><b style="top:12%"></b></i></div><div class="lfd"><i><b style="top:30%"></b></i></div><div class="lfd"><i><b style="top:64%"></b></i></div><div class="lfd"><i><b style="top:20%"></b></i></div></div>
     <p class="sub">Any four tracks. Faders, filters, tape echo, spring verb, siren.</p>
     <button id="goDemo" class="go">Play the demo</button>
+    <button id="goLast" class="go" hidden>Continue <span></span></button>
     <button id="goLoad" class="go alt">Load your tracks</button>
     <input type="file" id="startFiles" accept="audio/*,.mp3,.m4a,.wav,.aif,.aiff,.flac,.ogg" multiple hidden>
     <p class="install" id="install" hidden>Add to your Home Screen to keep your songs: tap <b>Share</b>, then <b>Add to Home Screen</b>.</p>
@@ -137,6 +138,7 @@
   <div class="shtop"><h2>Song</h2><button class="x" data-x aria-label="Close">&times;</button></div>
   <label class="fld"><span>Title</span><input id="fTitle" type="text" maxlength="60"></label>
   <label class="fld"><span>Tempo (BPM)</span><input id="fBpm" type="number" min="40" max="220" step="0.1" inputmode="decimal"></label>
+  <p class="note" id="bpmNote"></p>
   <div id="slots"></div>
   <button class="wide" id="loadAll">Load 4 to 8 files at once</button>
   <button class="wide alt" id="loadDemo">Load the demo song</button>
@@ -157,7 +159,7 @@
   <button class="wide" id="tourBtn">Take the tour</button>
   <dl class="help">
     <dt>Play</dt><dd>Starts and stops. Tap or drag the line to jump. Space bar on a keyboard.</dd>
-    <dt>Loop</dt><dd>Loops 4 bars from where you are. Tap again to let it run on.</dd>
+    <dt>Loop, Cues</dt><dd>Loop repeats 4 bars from where you are; tap again to let it run on. Hold Loop to drop a cue at the playhead: a tap near a cue on the line jumps right to it.</dd>
     <dt>Fader</dt><dd>Drag up and down. Double tap for full.</dd>
     <dt>Cut</dt><dd>The stepped filter. Up cuts the bass (high pass), down cuts the top (low pass). Double tap for off.</dd>
     <dt>Echo, Verb</dt><dd>Send the part into the tape echo or the reverb. Double tap for zero.</dd>
@@ -168,6 +170,7 @@
     <dt>FX</dt><dd>Sync or Free time, width, echo tone, echo into verb, and the reverb's type, decay and cuts.</dd>
     <dt>Mix A B C D</dt><dd>Hold a letter to store the whole mix (faders, sends, cuts, echo and verb). Tap it to bring the mix back, mid-song.</dd>
     <dt>Rec</dt><dd>Records what you hear. Share or save it when you stop.</dd>
+    <dt>Nudge</dt><dd>In the Song sheet, each track has a Nudge in milliseconds to line up parts that were exported a little early or late.</dd>
     <dt>Song</dt><dd>Tap the title to load your tracks (4 to 8: break out vocals, guitar, keys…), rename them and set the tempo. With more than 4, switch channels 1–4 and 5–8 above the strips.</dd>
     <dt>No sound</dt><dd>Volume up. Bluetooth headphones add delay to the pads: use wired or the speaker to play live.</dd>
   </dl>

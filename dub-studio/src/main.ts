@@ -7,6 +7,7 @@ import { makeTour, MIXER_TOUR } from './ui/tour';
 import * as A from './audio/engine';
 import { SPECS } from './audio/irs';
 import { renderDemo } from './audio/demo';
+import * as Store from './loader/store';
 import { control, guardPage, clamp, xFrac } from './ui/control';
 import { knob, fader, bar, seg } from './ui/widgets';
 
@@ -49,7 +50,7 @@ document.querySelectorAll<HTMLElement>('.st').forEach(st => {
   control(mu, { long: () => { q.solo = !q.solo; A.applySolo(); muteDraws.forEach(f => f()); }, longMs: 400,
     up: s => { if (s.long) return; if (q.solo) { q.solo = false; A.applySolo(); } else { q.mute = !q.mute; A.applyChan(c, 'mute'); } muteDraws.forEach(f => f()); } });
   const slot = st.querySelector<HTMLElement>('.slot')!;
-  draws.push(() => { const s = A.song.stems[c]; slot.textContent = s.name; slot.classList.toggle('empty', !s.buffer); st.hidden = c >= A.song.count; });
+  draws.push(() => { const s = A.song.stems[c]; slot.textContent = s.status ? '…' : s.name; slot.classList.toggle('empty', !s.meta); st.hidden = c >= A.song.count; });
   control(slot, { undoable: false, up: () => pickOne(c) });
 });
 // banks: phones show 4 strips at a time; 1-4 / 5-8 switches when there are more than 4 tracks
@@ -208,12 +209,14 @@ async function playToggle() {
 }
 control($('play'), { undoable: false, down: playToggle });
 control($('prog'), { undoable: false, down: (s, e) => { scrub = xFrac(s, e) * A.dur(); }, move: (s, e) => { scrub = xFrac(s, e) * A.dur(); },
-  up: () => { if (scrub !== null) A.seek(scrub); scrub = null; } });
+  up: () => { if (scrub !== null) { const d = A.dur(), near = A.song.cues.find(c => Math.abs(c - scrub!) < d * 0.04); A.seek(near ?? scrub); } scrub = null; } });
 addEventListener('keydown', e => { if (e.code !== 'Space' || !$('start').hidden || (e.target as Element).closest?.('input, select, textarea, button')) return; e.preventDefault(); if (!e.repeat) playToggle(); });
 
 // loop: 4 bars from the bar you are in
 function drawLoop() { const b = $('band'), d = A.dur() || 1; b.hidden = !A.loop.on; b.style.left = A.loop.a / d * 100 + '%'; b.style.width = (A.loop.b - A.loop.a) / d * 100 + '%'; $('loopBtn').classList.toggle('on', A.loop.on); $('loopBtn').setAttribute('aria-pressed', String(A.loop.on)); }
-control($('loopBtn'), { undoable: false, down: () => {
+control($('loopBtn'), { undoable: false, longMs: 450,
+  long: () => { if (!A.dur()) return; const t = Math.round(A.now() * 100) / 100; A.song.cues = [...A.song.cues.filter(c => Math.abs(c - t) > 0.5), t].sort((a, b) => a - b).slice(-12); drawCues(); saveSong(); toast(`Cue at ${fmt(t)}. Tap near it on the line to jump there.`); },
+  up: s => { if (s.long) return;
   if (!A.dur()) return;
   if (A.loop.on) A.loop.on = false;
   else { const barS = 240 / A.song.bpm, t = A.now(); A.loop.a = Math.floor(t / barS) * barS; A.loop.b = Math.min(A.dur(), A.loop.a + 4 * barS); A.loop.on = true; }
@@ -290,66 +293,131 @@ let latencyShown = false;
 function latencyCheck() { if (latencyShown) return; setTimeout(() => { const l = A.latency(); if (l > 0.09) { latencyShown = true; toast(`Sound delay ${Math.round(l * 1000)} ms (Bluetooth?). For live pads use wired or the speaker.`, 5000); } }, 1500); }
 
 // ---------- songs: load files, the demo, the Song sheet ----------
-function saveSong() { try { localStorage.setItem('dub-studio-song', JSON.stringify({ title: A.song.title, bpm: A.song.bpm, names: A.song.stems.map(s => s.name) })); } catch { /* */ } }
+// the song's metadata (names, tempo, gain, offsets, cues) is saved next to its pieces, so it can be opened again
+let metaT = 0;
+function songMeta(): Store.SongMeta {
+  return { id: A.song.id, title: A.song.title, bpm: A.song.bpm, bpmAuto: A.song.bpmAuto, sr: A.song.sr, seg: Store.SEG, gain: A.song.gain, cues: A.song.cues,
+    stems: A.song.stems.slice(0, A.song.count).map(st => st.meta ? { ...st.meta, name: st.name } : null), created: created, played: Date.now() };
+}
+let created = Date.now();
+function saveSong() { if (!A.song.id) return; clearTimeout(metaT); metaT = window.setTimeout(() => { Store.saveMeta(songMeta()); try { localStorage.setItem('dub-studio-last', A.song.id); } catch { /* */ } }, 300); }
+
 // file names to slots: each role has its home channel (see DEFAULT_NAMES)
 const ROLE: [RegExp, number][] = [[/drum|perc|beat|kit/i, 0], [/bass/i, 1], [/other|inst|music|backing/i, 2], [/vox|vocal|voice|sing|acap/i, 3],
   [/guit|gtr/i, 4], [/key|piano|organ|synth|pad/i, 5], [/horn|brass|sax|trump|tromb|flute|melod/i, 6], [/fx|sfx|effect|noise/i, 7]];
 const roleOf = (f: File) => ROLE.find(([r]) => r.test(f.name))?.[1] ?? -1;
 const base = (f: File) => f.name.replace(/\.[^.]+$/, '');
-async function loadInto(c: number, f: File) {
-  const s = A.song.stems[c]; s.name = '…'; redraw();
-  try { s.buffer = await A.decodeFile(f); s.file = f.name; const r = roleOf(f); s.name = r >= 0 ? A.DEFAULT_NAMES[r] : base(f).slice(0, 10); }
-  catch { s.buffer = null; s.name = 'Track ' + (c + 1); toast(`Could not read ${f.name}. Protected (Apple Music) or unsupported file.`, 4500); }
-  redraw(); slotsDraw(); drawLoop();
+const status = (c: number, t?: string) => { A.song.stems[c].status = t; slotsDraw(); redraw(); };
+const onsetsBy = new Map<number, { on: Float32Array; hop: number }>();
+
+// one stem: decode, hand to the worker (pieces, peaks, loudness, onsets), keep its metadata
+async function stemFrom(c: number, name: string, channels: () => Promise<Float32Array[]>, file?: string) {
+  status(c, 'Decoding…');
+  const data = await channels();
+  status(c, 'Saving…');
+  const r = await Store.pieceStem(A.song.id, c, A.song.sr, data);
+  A.song.stems[c].meta = { name, n: r.n, ch: r.ch, dur: r.dur, peaks: r.peaks, ms: r.ms, offset: 0, file };
+  A.song.stems[c].name = name; onsetsBy.set(c, { on: r.onsets, hop: r.hop });
+  status(c, undefined);
 }
-function clearSong(count: number) {
-  if (A.playing) { A.stop(); icon(); }
-  A.loop.on = false; A.seek(0); A.song.count = count;
-  A.song.stems.forEach((s, i) => { s.buffer = null; s.file = undefined; s.name = A.DEFAULT_NAMES[i]; });
+const fromFile = (f: File) => async () => { const b = await A.decodeFile(f); const out: Float32Array[] = []; for (let k = 0; k < Math.min(2, b.numberOfChannels); k++) out.push(new Float32Array(b.getChannelData(k))); return out; };
+function finishSong() {
+  // tempo: from the drums if there are any, else the first part
+  if (A.song.bpmAuto) { const src = onsetsBy.get(0) || onsetsBy.values().next().value; const bpm = src ? Store.detectBpm(src.on, A.song.sr, src.hop) : null; if (bpm) { A.song.bpm = bpm; echoChange(); } }
+  A.setSongGain(Store.songGain(A.song.stems.slice(0, A.song.count).map(s => s.meta?.ms || 0)));
+  onsetsBy.clear(); saveSong(); redraw(); slotsDraw(); drawLoop(); drawCues(); media();
+}
+function newSong(count: number, title: string, id = Store.newSongId()) {
+  if (A.playing) { A.stop(); icon(); letSleep(); }
+  A.loop.on = false; A.songChanged(); A.seek(0);
+  Object.assign(A.song, { id, title, count, bpmAuto: true, cues: [], gain: 1, sr: A.ctx ? A.ctx.sampleRate : 48000 }); created = Date.now();
+  A.song.stems.forEach((s, i) => { s.meta = null; s.status = undefined; s.name = A.DEFAULT_NAMES[i]; });
   S.ch.forEach(c => { c.solo = false; c.mute = false; }); A.applySolo(); for (let c = 0; c < A.N; c++) A.applyChan(c, 'mute');
 }
+async function loadInto(c: number, f: File) {
+  await A.ensure();
+  if (!A.song.id) newSong(Math.max(4, c + 1), base(f));
+  const wasPlaying = A.playing, t = A.now(); if (wasPlaying) A.stop();
+  const r = roleOf(f), name = r >= 0 ? A.DEFAULT_NAMES[r] : base(f).slice(0, 10);
+  try { await stemFrom(c, name, fromFile(f), f.name); A.songChanged(); }
+  catch { status(c, undefined); toast(`Could not read ${f.name}. Protected (Apple Music) or unsupported file.`, 4500); }
+  if (c !== 0) onsetsBy.clear();   // only the drums re-set the tempo
+  finishSong(); if (wasPlaying) A.play(t);
+}
 async function loadMany(files: File[]) {
-  if (!files.length) return;
+  if (!files.length) return; await A.ensure();
   const fs = files.slice(0, A.N), count = Math.max(4, fs.length), order: (File | null)[] = Array(count).fill(null), rest: File[] = [];
   if (files.length > A.N) toast(`Up to ${A.N} tracks: the first ${A.N} were loaded`, 4000);
   for (const f of fs) { const r = roleOf(f); if (r >= 0 && r < count && !order[r]) order[r] = f; else rest.push(f); }
   for (let i = 0; i < count && rest.length; i++) if (!order[i]) order[i] = rest.shift()!;
-  clearSong(count);
-  A.song.title = commonName(fs);
-  await Promise.all(order.map((f, i) => f ? loadInto(i, f) : Promise.resolve()));
-  redraw(); saveSong(); media(); toast(`Loaded ${fs.length} track${fs.length > 1 ? 's' : ''}`);
+  newSong(count, commonName(fs));
+  order.forEach((f, i) => { if (f) A.song.stems[i].status = 'Waiting…'; }); redraw();
+  let ok = 0;
+  for (let i = 0; i < count; i++) { const f = order[i]; if (!f) continue;   // one at a time keeps memory low on a phone
+    const r = roleOf(f);
+    try { await stemFrom(i, r >= 0 ? A.DEFAULT_NAMES[r] : base(f).slice(0, 10), fromFile(f), f.name); ok++; }
+    catch { status(i, undefined); toast(`Could not read ${f.name}. Protected (Apple Music) or unsupported file.`, 4500); } }
+  finishSong(); toast(`Loaded ${ok} track${ok === 1 ? '' : 's'}${A.song.bpmAuto ? ` · ${A.song.bpm} BPM` : ''}`);
 }
 function commonName(fs: File[]) { const n = fs.map(base); let p = n[0] || ''; for (const x of n) while (!x.startsWith(p)) p = p.slice(0, -1); p = p.replace(/[\s_\-.(]+$/, ''); return p.length > 2 ? p : 'My song'; }
+async function openSong(m: Store.SongMeta) {
+  await A.ensure();
+  newSong(Math.max(4, m.stems.length), m.title, m.id);
+  Object.assign(A.song, { bpm: m.bpm, bpmAuto: m.bpmAuto ?? false, sr: m.sr, cues: m.cues || [] }); created = m.created;
+  m.stems.forEach((st, i) => { if (st) { A.song.stems[i].meta = st; A.song.stems[i].name = st.name; } });
+  A.setSongGain(m.gain); echoChange(); saveSong(); redraw(); slotsDraw(); drawLoop(); drawCues(); media();
+}
 async function loadDemo() {
-  await A.ensure(); toast('Mixing the demo riddim…');
-  await new Promise(r => setTimeout(r, 30));
+  await A.ensure();
+  const old = await Store.loadMeta('demo');
+  if (old && old.sr === A.ctx!.sampleRate && (!Store.inMemory('demo') ? await Store.readPiece('demo', 0, 0) : true)) { await openSong(old); return; }   // made before: open it
+  toast('Mixing the demo riddim…'); await new Promise(r => setTimeout(r, 30));
+  await Store.deleteSong('demo');
   const d = renderDemo(A.ctx!.sampleRate);
-  clearSong(4);
-  d.data.forEach((x, i) => { A.song.stems[i] = { name: d.names[i], buffer: A.bufferFrom(x) }; });
-  A.song.title = d.title; A.song.bpm = d.bpm; echoChange(); saveSong(); redraw(); slotsDraw(); drawLoop(); media();
+  newSong(4, d.title, 'demo'); A.song.bpm = d.bpm; A.song.bpmAuto = false;
+  for (let i = 0; i < 4; i++) await stemFrom(i, d.names[i], async () => [d.data[i]]);
+  finishSong();
 }
 
 let pickSlot = 0;
 function pickOne(c: number) { pickSlot = c; ($('oneFile') as HTMLInputElement).click(); }
-$('oneFile').addEventListener('change', e => { const i = e.target as HTMLInputElement; const f = i.files?.[0]; if (f) loadInto(pickSlot, f).then(saveSong); i.value = ''; });
+$('oneFile').addEventListener('change', e => { const i = e.target as HTMLInputElement; const f = i.files?.[0]; if (f) loadInto(pickSlot, f); i.value = ''; });
 $('allFiles').addEventListener('change', e => { const i = e.target as HTMLInputElement; loadMany([...(i.files || [])]); i.value = ''; });
 control($('loadAll'), { undoable: false, up: () => ($('allFiles') as HTMLInputElement).click() });
 control($('loadDemo'), { undoable: false, up: () => { closeSheets(); loadDemo(); } });
 
+const wave = (peaks: number[], h = 22) => { const W = peaks.length; return `<svg class="wave" viewBox="0 0 ${W} ${h}" preserveAspectRatio="none"><path d="${peaks.map((p, x) => `M${x} ${(h / 2 - p * h / 2).toFixed(1)}V${(h / 2 + p * h / 2).toFixed(1)}`).join('')}"/></svg>`; };
+const esc = (t: string) => t.replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]!));
 function slotsDraw() {
   ($('fTitle') as HTMLInputElement).value = A.song.title; ($('fBpm') as HTMLInputElement).value = String(A.song.bpm);
-  $('slots').innerHTML = A.song.stems.slice(0, A.song.count).map((s, i) => `<div class="slotrow"><input data-i="${i}" value="${s.name.replace(/"/g, '&quot;')}" maxlength="12" aria-label="Track ${i + 1} name"><span>${s.buffer ? fmt(s.buffer.duration) : 'empty'}</span><button data-load="${i}">Load</button></div>`).join('')
-    + `<div class="slotadd">${A.song.count < A.N ? '<button id="addTrack">+ Add track</button>' : ''}${A.song.count > 4 ? '<button id="delTrack">− Remove last</button>' : ''}</div>`;
-  $('slots').querySelectorAll<HTMLInputElement>('input').forEach(inp => inp.addEventListener('input', () => { A.song.stems[+inp.dataset.i!].name = inp.value || '—'; redraw(); saveSong(); }));
+  $('bpmNote').textContent = A.song.bpmAuto && A.song.id ? 'Found from the drums. Tap Tap on the mixer, or type, to change it.' : '';
+  $('slots').innerHTML = A.song.stems.slice(0, A.song.count).map((s, i) => `<div class="slotrow">
+      <input data-i="${i}" value="${esc(s.name)}" maxlength="12" aria-label="Track ${i + 1} name">
+      <span>${s.status || (s.meta ? fmt(s.meta.dur) + (s.meta.ch === 1 ? ' mono' : '') : 'empty')}</span><button data-load="${i}">Load</button>
+      ${s.meta ? `<div class="wv">${wave(s.meta.peaks)}<label>Nudge <input type="number" data-off="${i}" value="${s.meta.offset}" step="5" min="-2000" max="2000" inputmode="numeric"> ms</label></div>` : ''}</div>`).join('')
+    + `<div class="slotadd">${A.song.count < A.N ? '<button id="addTrack">+ Add track</button>' : ''}${A.song.count > 4 ? '<button id="delTrack">− Remove last</button>' : ''}${A.song.cues.length ? '<button id="clearCues">Clear cues</button>' : ''}</div>`;
+  $('slots').querySelectorAll<HTMLInputElement>('input[data-i]').forEach(inp => inp.addEventListener('input', () => { A.song.stems[+inp.dataset.i!].name = inp.value || '—'; redraw(); saveSong(); }));
+  $('slots').querySelectorAll<HTMLInputElement>('input[data-off]').forEach(inp => inp.addEventListener('change', () => { const m = A.song.stems[+inp.dataset.off!].meta; if (!m) return;
+    m.offset = clamp(Math.round(+inp.value || 0), -2000, 2000); inp.value = String(m.offset); A.songChanged(); if (A.playing) A.play(A.now()); saveSong(); }));
   $('slots').querySelectorAll<HTMLElement>('[data-load]').forEach(b => b.addEventListener('click', () => pickOne(+b.dataset.load!)));
   document.getElementById('addTrack')?.addEventListener('click', () => { A.song.count++; bank = Math.floor((A.song.count - 1) / 4); slotsDraw(); redraw(); saveSong(); });
-  document.getElementById('delTrack')?.addEventListener('click', () => { const i = --A.song.count; const st = A.song.stems[i]; st.buffer = null; st.name = A.DEFAULT_NAMES[i];
+  document.getElementById('delTrack')?.addEventListener('click', () => { const i = --A.song.count; const st = A.song.stems[i]; st.meta = null; st.name = A.DEFAULT_NAMES[i];
     S.ch[i].solo = false; A.applySolo(); if (A.playing) A.play(A.now()); slotsDraw(); redraw(); saveSong(); });
+  document.getElementById('clearCues')?.addEventListener('click', () => { A.song.cues = []; drawCues(); slotsDraw(); saveSong(); });
 }
 $('fTitle').addEventListener('input', e => { A.song.title = (e.target as HTMLInputElement).value; $('songBtn').textContent = A.song.title || 'Untitled'; saveSong(); media(); });
-$('fBpm').addEventListener('change', e => { const v = +(e.target as HTMLInputElement).value; if (v >= 40 && v <= 220) { A.song.bpm = v; echoChange(); saveSong(); } });
+$('fBpm').addEventListener('change', e => { const v = +(e.target as HTMLInputElement).value; if (v >= 40 && v <= 220) { A.song.bpm = v; A.song.bpmAuto = false; echoChange(); saveSong(); slotsDraw(); } });
 draws.push(() => { $('songBtn').textContent = A.song.title || 'Load tracks'; });
 control($('songBtn'), { undoable: false, up: () => { slotsDraw(); openSheet('songSheet'); } });
+
+// ---------- cues: hold Loop to drop one at the playhead; taps on the line snap to them ----------
+function drawCues() {
+  const d = A.dur() || 1, pr = $('prog'); pr.querySelectorAll('.cue').forEach(x => x.remove());
+  for (const c of A.song.cues) { const i = document.createElement('i'); i.className = 'cue'; i.style.left = c / d * 100 + '%'; pr.appendChild(i); }
+  const W = 160, pk = Array.from({ length: W }, (_, x) => Math.max(0, ...A.song.stems.slice(0, A.song.count).map(s => s.meta ? s.meta.peaks[Math.floor(x * s.meta.peaks.length / W)] * (s.meta.dur / d) : 0)));
+  $('progWave').innerHTML = A.dur() ? wave(pk, 14) : '';
+}
+draws.push(drawCues);
 
 // ---------- sheets ----------
 function openSheet(id: string) { $(id).hidden = false; }
@@ -358,7 +426,9 @@ document.querySelectorAll<HTMLElement>('.sheetbg').forEach(s => s.addEventListen
 control($('helpBtn'), { undoable: false, up: () => openSheet('helpSheet') });
 
 // ---------- start screen ----------
-{ try { const j = JSON.parse(localStorage.getItem('dub-studio-song') || 'null'); if (j) { A.song.bpm = j.bpm || 75; } } catch { /* */ } }
+{ let last = ''; try { last = localStorage.getItem('dub-studio-last') || ''; } catch { /* */ }
+  if (last) Store.loadMeta(last).then(m => { if (!m) return; const b = $('goLast'); b.hidden = false; b.querySelector('span')!.textContent = m.title || 'Untitled';
+    b.addEventListener('click', async () => { A.ensure(); go(); await openSong(m); playToggle(); }); }); }
 const standalone = matchMedia('(display-mode: standalone)').matches || (navigator as Navigator & { standalone?: boolean }).standalone;
 if (/iPhone|iPad|iPod/.test(navigator.userAgent) && !standalone) $('install').hidden = false;
 const go = () => { $('start').hidden = true; requestAnimationFrame(redraw); firstTour(); };

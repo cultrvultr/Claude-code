@@ -9,7 +9,7 @@
     "preview": "vite preview --host",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
-    "test:e2e": "node tests/smoke.cjs && node tests/channels.cjs && node tests/phase1.cjs"
+    "test:e2e": "node tests/smoke.cjs && node tests/channels.cjs && node tests/phase1.cjs && node tests/loader.cjs"
   },
   "devDependencies": {
     "typescript": "^5.9.3",
