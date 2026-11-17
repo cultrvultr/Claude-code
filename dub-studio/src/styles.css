@@ -87,7 +87,7 @@ button { font: inherit; color: inherit; background: none; border: 0; padding: 0;
 .slot.empty { color: var(--ink2); opacity: .7; }
 .k { display: flex; flex-direction: column; align-items: center; }
 .kv { font-size: calc(10px * var(--z)); text-transform: uppercase; letter-spacing: .6px; color: var(--ink2); white-space: nowrap; height: 13px; }
-.kn, .lvk { width: calc(clamp(30px, min(4.8vh, 9.5vw), 42px) * var(--z)); height: calc(clamp(30px, min(4.8vh, 9.5vw), 42px) * var(--z)); touch-action: none; display: block; }
+.kn, .lvk { width: calc(clamp(36px, min(6vh, 12vw), 50px) * var(--z)); height: calc(clamp(36px, min(6vh, 12vw), 50px) * var(--z)); touch-action: none; display: block; }
 .k-track { fill: none; stroke: rgba(43, 32, 21, .22); stroke-width: 3; stroke-linecap: round; }
 .k-fill { fill: none; stroke: var(--red); stroke-width: 3; stroke-linecap: round; }
 .k-body { fill: var(--knob); stroke: #0e0a07; stroke-width: 1; }
@@ -266,7 +266,7 @@ button { font: inherit; color: inherit; background: none; border: 0; padding: 0;
 @media (max-height: 600px) {   /* iPhone SE and similar in Safari */
   #app { gap: 5px; } .brand { font-size: 18px; white-space: nowrap; } .song { padding: 6px 9px; } .prog { height: 18px; }
   .snaps i { padding: 4px 0; width: 30px; font-size: 13px; } .st { padding: 4px 3px; gap: 0; }
-  .kn { width: 28px; height: 28px; } .kv { font-size: 8.5px; height: 10px; letter-spacing: .3px; } .fd { min-height: 40px; margin: 2px 0 1px; }
+  .kn { width: 32px; height: 32px; } .kv { font-size: 8.5px; height: 10px; letter-spacing: .3px; } .fd { min-height: 40px; margin: 2px 0 1px; }
   .echo { padding: 6px 9px; gap: 8px; }
 }
 @media (max-width: 380px) { .brand { font-size: 17px; } .tabs button { padding: 6px 6px; letter-spacing: .5px; } }

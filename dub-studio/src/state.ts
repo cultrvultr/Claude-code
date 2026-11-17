@@ -21,7 +21,7 @@ export const freshChan = (): Chan => ({ cut: 0, echo: 0, verb: 0, fader: 1, mute
 export const freshMix = (): Mix => ({
   rep: 6, dly: 0.45, sync: true, div: 3, width: 0, bass: 0, treb: -1, e2v: 0.55, ret: 1,
   vIr: 0, vDec: 0, vLc: 3, vHc: 0, vRet: 1,
-  sir: { base: 1, mode: 0, beat: 1, vol: 0.7, momentary: false },
+  sir: { base: 1, mode: 0, beat: 1, vol: 0.7, momentary: true },   // the siren plays while held
   syn: { x: 0.33, dec: 0.25, level: 0.5 },
   mix: 6.5,
 });
@@ -36,6 +36,7 @@ const load = (): State => {
       Object.assign(s.m, j.m, { sir: { ...s.m.sir, ...(j.m.sir || {}) }, syn: { ...s.m.syn, ...(j.m.syn || {}) } });
     }
   } catch { /* private mode or bad data: defaults */ }
+  try { if (!localStorage.getItem('dub-studio-siren-hold')) { s.m.sir.momentary = true; localStorage.setItem('dub-studio-siren-hold', '1'); } } catch { /* */ }   // once: hold becomes the default for everyone
   return s;
 };
 

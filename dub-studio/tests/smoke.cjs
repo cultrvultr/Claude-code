@@ -15,7 +15,10 @@ const fail = m => { console.error('FAIL', m); process.exitCode = 1; };
   if (await peak() < 0.05) fail('no sound from the demo');
   await p.tap('#play'); await p.waitForTimeout(2500);
   await p.tap('#pSyn'); if (await peak() < 0.02) fail('Synare silent');
-  await p.waitForTimeout(3000); await p.tap('#pSir'); if (await peak() < 0.02) fail('Siren silent'); await p.tap('#pSir');
+  // the siren plays while held (momentary by default)
+  await p.waitForTimeout(3000); const sb = await p.locator('#pSir').boundingBox(); await p.mouse.move(sb.x + 30, sb.y + sb.height / 2); await p.mouse.down();
+  if (await peak() < 0.02) fail('Siren silent while held'); await p.mouse.up(); await p.waitForTimeout(4000);
+  if (await p.evaluate(() => document.getElementById('pSir').classList.contains('on'))) fail('Siren still on after letting go');
   const k = await p.locator('.st').nth(0).locator('.kn').first().boundingBox();
   await p.mouse.move(k.x + 20, k.y + 20); await p.mouse.down(); await p.mouse.move(k.x + 20, k.y - 30, { steps: 4 }); await p.mouse.up();
   if (!(await p.textContent('.st .kv')).startsWith('HP')) fail('Cut knob did not step to high pass');
