@@ -23,9 +23,9 @@ function wav(seconds, hz) {   // mono 16-bit sine
   if (await p.isHidden('#banks')) fail('bank switch hidden with 6 tracks');
   const vis = () => p.$$eval('.st:not([hidden]):not(.off) .slot', e => e.map(x => x.textContent).join(','));
   if ((await vis()) !== 'Drums,Bass,Horns,Vocals') fail('bank 1 shows ' + await vis());
-  await p.locator('#banks i').nth(1).tap(); await p.waitForTimeout(100);
+  await p.locator('#banks i').nth(1).tap(); await p.waitForTimeout(300);
   if ((await vis()) !== 'Guitar,Keys') fail('bank 2 shows ' + await vis());
-  await p.locator('#banks i').nth(0).tap();
+  await p.locator('#banks i').nth(0).tap(); await p.waitForTimeout(300);   // the strips slide in
   const m = p.locator('.st .mute').first(), bb = await m.boundingBox();
   await p.mouse.move(bb.x + 10, bb.y + 10); await p.mouse.down(); await p.waitForTimeout(500);
   if (!(await m.getAttribute('class')).includes('solo') || (await m.textContent()) !== 'Solo') fail('holding Mute did not solo');

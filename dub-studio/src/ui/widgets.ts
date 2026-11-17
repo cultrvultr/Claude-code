@@ -48,6 +48,7 @@ export function knob(svg: SVGSVGElement, o: KnobOpts) {
       if (v !== before) { o.set(v); draw(); setBubble(text(v)); if (o.steps || (o.bi && (v - 0.5) * (before - 0.5) <= 0) || v === 0 || v === 1) tick(); }
     },
     up: hideBubble,
+    cancel: g => { if (g.v0 !== undefined) { o.set(g.v0); draw(); } hideBubble(); },   // a swipe took over
     dbl: () => { o.set(o.home); draw(); tick(); hideBubble(); },
   });
   draw(); return () => { shown = NaN; draw(); };
@@ -62,6 +63,7 @@ export function fader(el: HTMLElement, get: () => number, set: (v: number) => vo
     down: s => { s.v0 = get(); },
     move: (s, e) => { const before = get(), v = clamp(s.v0! + (s.y0 - e.clientY) / (s.r.height - 24), 0, 1); if (v === before) return; set(v); draw(); if (v === 1 || v === 0) tick(); },
     dbl: () => { set(1); draw(); tick(); },
+    cancel: g => { if (g.v0 !== undefined) { set(g.v0); draw(); } },
   });
   addEventListener('resize', () => { measure(); draw(); });
   return () => { measure(); draw(); };

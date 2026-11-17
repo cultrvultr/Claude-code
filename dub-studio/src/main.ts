@@ -10,7 +10,7 @@ import { DEMO } from './audio/demo';
 import DemoWorker from './audio/demo.worker.ts?worker';
 import * as Store from './loader/store';
 import * as Split from './split/split';
-import { control, guardPage, clamp, xFrac } from './ui/control';
+import { control, guardPage, clamp, xFrac, abandonWithin } from './ui/control';
 import { knob, fader, bar, seg } from './ui/widgets';
 import { tick } from './ui/haptic';
 
@@ -53,7 +53,8 @@ document.querySelectorAll<HTMLElement>('.st').forEach(st => {
   const df = fader(fd, () => q.fader, v => { q.fader = v; A.applyChan(c, 'fader'); }); draws.push(df); faderDraws.push(df); addEventListener('resize', df);
   meterEls.push(st.querySelector<HTMLElement>('.mt i')!);
   const th = st.querySelector<HTMLElement>('.throw')!;
-  control(th, { undoable: false, down: async () => { await A.ensure(); A.setThrow(c, true); th.classList.add('on'); }, up: () => { A.setThrow(c, false); th.classList.remove('on'); } });
+  const throwOff = () => { A.setThrow(c, false); th.classList.remove('on'); };
+  control(th, { undoable: false, down: async () => { await A.ensure(); A.setThrow(c, true); th.classList.add('on'); }, up: throwOff, cancel: throwOff });
   // Mute: tap toggles mute; a long press toggles solo (green)
   const mu = st.querySelector<HTMLElement>('.mute')!;
   const dm = () => { mu.classList.toggle('on', q.mute && !q.solo); mu.classList.toggle('solo', q.solo); mu.textContent = q.solo ? 'Solo' : 'Mute'; };
@@ -62,6 +63,7 @@ document.querySelectorAll<HTMLElement>('.st').forEach(st => {
   control(mu, { longMs: 300,
     long: g => { (g as typeof g & { wasMuted: boolean }).wasMuted = q.mute; if (q.mute) { q.mute = false; A.applyChan(c, 'mute'); }
       q.solo = true; A.applySolo(); tick(); muteDraws.forEach(f => f()); },
+    cancel: g => { if (!g.long) return; q.solo = false; if ((g as typeof g & { wasMuted: boolean }).wasMuted) { q.mute = true; A.applyChan(c, 'mute'); } A.applySolo(); muteDraws.forEach(f => f()); },
     up: g => {
       if (g.long) { q.solo = false; if ((g as typeof g & { wasMuted: boolean }).wasMuted) { q.mute = true; A.applyChan(c, 'mute'); } A.applySolo(); muteDraws.forEach(f => f()); return; }
       tick(); q.mute = !q.mute; A.applyChan(c, 'mute'); muteDraws.forEach(f => f()); } });
@@ -79,7 +81,30 @@ function drawBank() {
   $('banks').querySelectorAll<HTMLElement>('i').forEach((b, i) => { b.classList.toggle('on', i === bank); b.textContent = i ? `5–${A.song.count}` : '1–4'; });
   requestAnimationFrame(() => { faderDraws.forEach(f => f()); strips.querySelectorAll<HTMLElement>('.st:not(.off):not([hidden]) .slot').forEach(fitName); });
 }
-$('banks').querySelectorAll<HTMLElement>('i').forEach((b, i) => control(b, { undoable: false, down: () => { bank = i; drawBank(); requestAnimationFrame(redraw); } }));
+function setBank(b: number) {
+  if (b === bank) return; const dir = b > bank ? 'in-r' : 'in-l'; bank = b; tick(); drawBank(); requestAnimationFrame(redraw);
+  strips.classList.remove('in-l', 'in-r'); void strips.offsetWidth; strips.classList.add(dir);   // 5-8 slides in from the right, 1-4 from the left
+}
+$('banks').querySelectorAll<HTMLElement>('i').forEach((b, i) => control(b, { undoable: false, down: () => setBank(i) }));
+// swipe across the strips to switch banks: they follow the finger, then snap (any knob or fader the swipe started on lets go)
+{ let id = -1, x0 = 0, y0 = 0, t0 = 0, on = false, dx = 0;
+  const canSwipe = () => A.song.count > 4 && innerWidth < 700;
+  strips.addEventListener('pointerdown', e => { if (id >= 0 || !canSwipe()) return; id = e.pointerId; x0 = e.clientX; y0 = e.clientY; t0 = e.timeStamp; on = false; dx = 0; });
+  strips.addEventListener('pointermove', e => {
+    if (e.pointerId !== id) return; dx = e.clientX - x0; const dy = e.clientY - y0;
+    if (!on) { if (Math.abs(dx) > 14 && Math.abs(dx) > 1.6 * Math.abs(dy)) { on = true; abandonWithin(strips); try { strips.setPointerCapture(id); } catch { /* */ } strips.classList.remove('in-l', 'in-r'); } else return; }
+    const edge = (bank === 0 && dx > 0) || (bank === 1 && dx < 0);   // nothing that way: resist
+    strips.style.transform = `translate3d(${(edge ? dx * 0.25 : dx).toFixed(1)}px, 0, 0)`;
+  });
+  const end = (e: PointerEvent) => {
+    if (e.pointerId !== id) return; id = -1; if (!on) return; on = false;
+    const v = dx / Math.max(1, e.timeStamp - t0), far = Math.abs(dx) > strips.clientWidth * 0.18 || Math.abs(v) > 0.45;
+    strips.style.transform = '';
+    if (far && dx < 0 && bank === 0) setBank(1); else if (far && dx > 0 && bank === 1) setBank(0);
+    else { strips.classList.add('back'); setTimeout(() => strips.classList.remove('back'), 200); }
+  };
+  strips.addEventListener('pointerup', end); strips.addEventListener('pointercancel', end);
+}
 draws.push(drawBank); addEventListener('resize', drawBank);
 
 // ---------- Siren and Synare pads ----------

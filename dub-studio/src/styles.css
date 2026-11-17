@@ -275,3 +275,12 @@ button { font: inherit; color: inherit; background: none; border: 0; padding: 0;
 }
 @media (max-height: 640px) { .kn { width: 30px; height: 30px; } .kv { font-size: 8.5px; height: 10px; letter-spacing: .3px; } }
 @media (max-width: 380px) { .brand { font-size: 17px; } .tabs button { padding: 6px 6px; letter-spacing: .5px; } }
+
+/* ---- bank swipe ---- */
+.strips { will-change: transform; touch-action: none; }
+.strips.back { transition: transform .18s cubic-bezier(.2,.8,.2,1); }
+.strips.in-r { animation: inR .2s cubic-bezier(.2,.8,.2,1); }
+.strips.in-l { animation: inL .2s cubic-bezier(.2,.8,.2,1); }
+@keyframes inR { from { transform: translate3d(36%, 0, 0); opacity: .4; } to { transform: none; opacity: 1; } }
+@keyframes inL { from { transform: translate3d(-36%, 0, 0); opacity: .4; } to { transform: none; opacity: 1; } }
+@media (prefers-reduced-motion: reduce) { .strips.in-r, .strips.in-l { animation: none; } .strips.back { transition: none; } }

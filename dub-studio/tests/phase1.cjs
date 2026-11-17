@@ -9,7 +9,7 @@ const hold = async (p, loc, ms) => { const b = await loc.boundingBox(); await p.
   const errs = []; p.on('pageerror', e => errs.push(e.message)); p.on('console', m => { if (m.type() === 'error') errs.push(m.text()); });
   await p.goto(URL); await p.tap('#goDemo'); await p.waitForTimeout(1500);
   if (!(await p.isVisible('#tour .tip'))) fail('tour did not open on first visit');
-  for (let i = 0; i < 16; i++) { const t = await p.textContent('#tour h3'); if (i === 5 && t !== 'Fader') fail('step 6 is ' + t); await p.click('#tour .next'); }
+  for (let i = 0; i < 17; i++) { const t = await p.textContent('#tour h3'); if (i === 5 && t !== 'Fader') fail('step 6 is ' + t); await p.click('#tour .next'); }
   if (await p.isVisible('#tour .tip')) fail('tour did not close on Done');
   // store A with the fader full, pull the fader down, recall A
   await hold(p, p.locator('#snaps i').nth(0), 700);
