@@ -1,0 +1,41 @@
+name: Deploy Dub Studio to Cloudflare Pages
+
+on:
+  push:
+    branches: [main, claude/brave-mendel-dxnsda]
+    paths: ['dub-studio/**', '.github/workflows/dub-studio-deploy.yml']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: dub-studio-deploy
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: dub-studio
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+          cache-dependency-path: dub-studio/package-lock.json
+
+      - run: npm ci
+      - run: npm run build
+
+      # Production branch of the Pages project is "main"; deploying under that name publishes to dub-studio-7il.pages.dev
+      - name: Deploy
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          workingDirectory: dub-studio
+          command: pages deploy dist --project-name dub-studio --branch main --commit-hash ${{ github.sha }}
