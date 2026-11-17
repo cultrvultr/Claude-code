@@ -14,11 +14,19 @@ const fail = m => { console.error('FAIL', m); process.exitCode = 1; };
   const l0 = await layouts(); await p.waitForTimeout(2000); const idle = await layouts() - l0;
   console.log('  layouts in 2 s of untouched playback:', idle);
   if (idle > 8) fail('the idle mixer lays out ' + idle + ' times in 2 s');
-  // Mute acts on touch-down
-  const mu = await p.locator('.st .mute').first().boundingBox();
-  await p.mouse.move(mu.x + 10, mu.y + 10); await p.mouse.down(); await p.waitForTimeout(60);
-  if (!(await p.getAttribute('.st .mute >> nth=0', 'class')).includes('on')) fail('mute waited for the finger to lift');
-  await p.mouse.up(); await p.locator('.st .mute').first().tap();
+  // Mute: a tap mutes; holding solos it without muting it on the way
+  const mu = await p.locator('.st .mute').first().boundingBox(), cls = () => p.getAttribute('.st .mute >> nth=0', 'class');
+  await p.mouse.move(mu.x + 10, mu.y + 10); await p.mouse.down(); await p.waitForTimeout(200);
+  if ((await cls()).includes(' on')) fail('holding Mute muted the part before it soloed');
+  await p.waitForTimeout(300); if (!(await cls()).includes('solo')) fail('holding Mute did not solo'); await p.mouse.up();
+  if ((await cls()).includes(' on')) fail('the soloed part is also muted');
+  await p.waitForTimeout(400);
+  const lv = await p.evaluate(async () => { const s = [0, 0, 0, 0]; for (let i = 0; i < 20; i++) { await new Promise(r => setTimeout(r, 50)); window.__dub.meters().ch.slice(0, 4).forEach((v, k) => { s[k] = Math.max(s[k], v); }); } return s; });
+  console.log('  levels with Drums soloed:', lv.map(v => v.toFixed(3)).join(' '));
+  if (lv[0] < 0.005 || Math.max(lv[1], lv[2], lv[3]) > 0.001) fail('solo did not leave only the soloed part playing');
+  await p.locator('.st .mute').first().tap(); if ((await cls()).includes('solo')) fail('a tap did not un-solo');
+  await p.locator('.st .mute').first().tap(); if (!(await cls()).includes(' on')) fail('a tap did not mute');
+  await p.locator('.st .mute').first().tap();
   // Loop acts on touch-down
   const lb = await p.locator('#loopBtn').boundingBox();
   await p.mouse.move(lb.x + 10, lb.y + 10); await p.mouse.down(); await p.waitForTimeout(60);
@@ -33,9 +41,10 @@ const fail = m => { console.error('FAIL', m); process.exitCode = 1; };
   if (await p.isVisible('.bubble')) fail('bubble stayed after release');
   await p.mouse.move(x, y); await p.mouse.down(); await p.mouse.up(); await p.waitForTimeout(350);   // not a double tap
   const k2 = p.locator('.st .kn[data-p="echo"]').nth(1), kb2 = await k2.boundingBox(), x2 = kb2.x + 20, y2 = kb2.y + 20;
-  await p.mouse.move(x2, y2); await p.mouse.down(); for (let i = 1; i <= 20; i++) { await p.mouse.move(x2, y2 - 2 * i); await p.waitForTimeout(40); } await p.mouse.up();
+  await p.mouse.move(x2, y2); await p.mouse.down(); for (let i = 1; i <= 40; i++) { await p.mouse.move(x2, y2 - i); await p.waitForTimeout(45); } await p.mouse.up();
   const slow = Number(await k2.getAttribute('aria-valuenow'));
-  console.log(`  echo after a fast 40 px drag: ${fast}, after a slow 40 px drag: ${slow}`);
+  console.log(`  echo after a quick 40 px drag: ${fast}, after a creeping 40 px drag: ${slow}`);
+  if (fast < 60) fail('knobs are still stiff: a quick 40 px drag only reached ' + fast);
   if (!(slow > 0 && slow < fast * 0.6)) fail('slow drags are not finer');
   if (errs.length) fail('console errors: ' + errs.join(' | '));
   await b.close(); if (!process.exitCode) console.log('PASS feel');

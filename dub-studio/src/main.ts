@@ -34,11 +34,18 @@ for (let c = 0; c < A.N; c++) strips.insertAdjacentHTML('beforeend', `<div class
   <div class="fd"><div class="tr"></div><div class="lv"></div><div class="mt"><i></i></div><div class="cap"></div></div>
   <button class="throw">Throw</button><button class="mute">Mute</button></div>`);
 const meterEls: HTMLElement[] = [];
+// track names: full size if they fit, else smaller, else two lines (never cut off)
+function fitName(el: HTMLElement) {
+  el.style.fontSize = ''; el.classList.remove('two');
+  requestAnimationFrame(() => { const w = el.clientWidth; if (!w) return; const full = el.scrollWidth;
+    if (full <= w) return; const k = w / full;
+    if (k >= 0.72) el.style.fontSize = `calc(${(13 * k).toFixed(1)}px * var(--z))`; else el.classList.add('two'); });
+}
 const muteDraws: (() => void)[] = [], faderDraws: (() => void)[] = [];
 document.querySelectorAll<HTMLElement>('.st').forEach(st => {
   const c = +st.dataset.c!, q = S.ch[c];
   const [kc, ke, kv] = [...st.querySelectorAll<SVGSVGElement>('.kn')];
-  draws.push(knob(kc, { get: () => (q.cut + 10) / 20, set: v => { q.cut = Math.round(v * 20) - 10; A.applyChan(c, 'cut'); }, home: 0.5, bi: true, steps: 20, label: v => cutLab(Math.round(v * 20) - 10), sens: 160 }));
+  draws.push(knob(kc, { get: () => (q.cut + 10) / 20, set: v => { q.cut = Math.round(v * 20) - 10; A.applyChan(c, 'cut'); }, home: 0.5, bi: true, steps: 20, label: v => cutLab(Math.round(v * 20) - 10), sens: 100 }));
   draws.push(knob(ke, { get: () => q.echo, set: v => { q.echo = v; A.applyChan(c, 'echo'); }, home: 0, name: 'Echo' }));
   draws.push(knob(kv, { get: () => q.verb, set: v => { q.verb = v; A.applyChan(c, 'verb'); }, home: 0, name: 'Verb' }));
   const fd = st.querySelector<HTMLElement>('.fd')!;
@@ -50,12 +57,12 @@ document.querySelectorAll<HTMLElement>('.st').forEach(st => {
   const mu = st.querySelector<HTMLElement>('.mute')!;
   const dm = () => { mu.classList.toggle('on', q.mute && !q.solo); mu.classList.toggle('solo', q.solo); mu.textContent = q.solo ? 'Solo' : 'Mute'; };
   draws.push(dm); muteDraws.push(dm);
-  // acts the moment the finger lands; held on, it undoes that and toggles solo instead
-  control(mu, { longMs: 400,
-    down: s => { tick(); s.skip = q.solo; if (q.solo) { q.solo = false; A.applySolo(); } else { q.mute = !q.mute; A.applyChan(c, 'mute'); } muteDraws.forEach(f => f()); },
-    long: s => { if (s.skip) return; q.mute = !q.mute; A.applyChan(c, 'mute'); q.solo = true; A.applySolo(); tick(); muteDraws.forEach(f => f()); } });   // a soloed part: the touch already un-soloed it
+  // tap: mute (or un-solo); hold: solo, without ever muting the part on the way
+  control(mu, { longMs: 350,
+    up: s => { if (s.long) return; tick(); if (q.solo) { q.solo = false; A.applySolo(); } else { q.mute = !q.mute; A.applyChan(c, 'mute'); } muteDraws.forEach(f => f()); },
+    long: () => { q.solo = !q.solo; if (q.solo && q.mute) { q.mute = false; A.applyChan(c, 'mute'); } A.applySolo(); tick(); muteDraws.forEach(f => f()); } });
   const slot = st.querySelector<HTMLElement>('.slot')!;
-  draws.push(() => { const s = A.song.stems[c]; slot.textContent = s.status ? '…' : s.name; slot.classList.toggle('empty', !s.meta); st.hidden = c >= A.song.count; });
+  draws.push(() => { const s = A.song.stems[c], t = s.status ? '…' : s.name; if (slot.textContent !== t) { slot.textContent = t; fitName(slot); } slot.classList.toggle('empty', !s.meta); st.hidden = c >= A.song.count; });
   control(slot, { undoable: false, up: () => pickOne(c) });
 });
 // banks: phones show 4 strips at a time; 1-4 / 5-8 switches when there are more than 4 tracks
@@ -66,7 +73,7 @@ function drawBank() {
   if (!many || wide) bank = 0;
   strips.querySelectorAll<HTMLElement>('.st').forEach((st, c) => st.classList.toggle('off', !wide && many && Math.floor(c / 4) !== bank));
   $('banks').querySelectorAll<HTMLElement>('i').forEach((b, i) => { b.classList.toggle('on', i === bank); b.textContent = i ? `5–${A.song.count}` : '1–4'; });
-  requestAnimationFrame(() => faderDraws.forEach(f => f()));
+  requestAnimationFrame(() => { faderDraws.forEach(f => f()); strips.querySelectorAll<HTMLElement>('.st:not(.off):not([hidden]) .slot').forEach(fitName); });
 }
 $('banks').querySelectorAll<HTMLElement>('i').forEach((b, i) => control(b, { undoable: false, down: () => { bank = i; drawBank(); requestAnimationFrame(redraw); } }));
 draws.push(drawBank); addEventListener('resize', drawBank);
@@ -86,7 +93,7 @@ control(pSyn, { undoable: false, down: async (s, e) => {
 document.querySelectorAll<SVGSVGElement>('.lvk').forEach(k => {
   k.addEventListener('pointerdown', e => e.stopPropagation());
   const sir = k.dataset.l === 'sir';
-  draws.push(knob(k, { get: () => sir ? S.m.sir.vol : S.m.syn.level, set: v => { if (sir) S.m.sir.vol = v; else S.m.syn.level = v; A.applyEcho(); }, home: sir ? 0.7 : 0.5, sens: 160, name: sir ? 'Siren' : 'Synare' }));
+  draws.push(knob(k, { get: () => sir ? S.m.sir.vol : S.m.syn.level, set: v => { if (sir) S.m.sir.vol = v; else S.m.syn.level = v; A.applyEcho(); }, home: sir ? 0.7 : 0.5, sens: 70, name: sir ? 'Siren' : 'Synare' }));
 });
 
 // ---------- the echo card ----------
@@ -332,6 +339,17 @@ const ROLE: [RegExp, number][] = [[/drum|perc|beat|kit/i, 0], [/bass/i, 1], [/ot
   [/guit|gtr/i, 4], [/key|piano|organ|synth|pad/i, 5], [/horn|brass|sax|trump|tromb|flute|melod/i, 6], [/fx|sfx|effect|noise/i, 7]];
 const roleOf = (f: File) => ROLE.find(([r]) => r.test(f.name))?.[1] ?? -1;
 const base = (f: File) => f.name.replace(/\.[^.]+$/, '');
+// a part's name from its file: without the song name the files share ("Song - sax" -> "Sax")
+function partName(f: File, all: File[]) {
+  const r = roleOf(f); if (r >= 0) return A.DEFAULT_NAMES[r];
+  let n = base(f); const p = all.length > 1 ? commonPrefix(all.map(base)) : '';
+  if (p.length > 2 && n.length > p.length) n = n.slice(p.length);
+  n = n.replace(/^[\s_\-.()[\]]+|[\s_\-.()[\]]+$/g, '').replace(/[_]+/g, ' ');
+  n = n.charAt(0).toUpperCase() + n.slice(1);
+  if (n.length > 24) { const w = n.slice(0, 25).lastIndexOf(' '); n = w > 6 ? n.slice(0, w) : n.slice(0, 24); }   // whole words
+  return n || 'Track';
+}
+function commonPrefix(n: string[]) { let p = n[0] || ''; for (const x of n) while (!x.startsWith(p)) p = p.slice(0, -1); return p; }
 const status = (c: number, t?: string) => { A.song.stems[c].status = t; slotsDraw(); redraw(); };
 const onsetsBy = new Map<number, { on: Float32Array; hop: number }>();
 
@@ -364,7 +382,7 @@ async function loadInto(c: number, f: File) {
   await A.ensure();
   if (!A.song.id) newSong(Math.max(4, c + 1), base(f));
   const wasPlaying = A.playing, t = A.now(); if (wasPlaying) A.stop();
-  const r = roleOf(f), name = r >= 0 ? A.DEFAULT_NAMES[r] : base(f).slice(0, 10);
+  const name = partName(f, [f]);
   try { await stemFrom(c, name, fromFile(f), f.name); A.songChanged(); }
   catch { status(c, undefined); toast(`Could not read ${f.name}. Protected (Apple Music) or unsupported file.`, 4500); }
   if (c !== 0) onsetsBy.clear();   // only the drums re-set the tempo
@@ -380,8 +398,7 @@ async function loadMany(files: File[]) {
   order.forEach((f, i) => { if (f) A.song.stems[i].status = 'Waiting…'; }); redraw();
   let ok = 0;
   for (let i = 0; i < count; i++) { const f = order[i]; if (!f) continue;   // one at a time keeps memory low on a phone
-    const r = roleOf(f);
-    try { await stemFrom(i, r >= 0 ? A.DEFAULT_NAMES[r] : base(f).slice(0, 10), fromFile(f), f.name); ok++; }
+    try { await stemFrom(i, partName(f, fs), fromFile(f), f.name); ok++; }
     catch { status(i, undefined); toast(`Could not read ${f.name}. Protected (Apple Music) or unsupported file.`, 4500); } }
   finishSong(); toast(`Loaded ${ok} track${ok === 1 ? '' : 's'}${A.song.bpmAuto ? ` · ${A.song.bpm} BPM` : ''}`);
 }
@@ -419,7 +436,7 @@ function slotsDraw() {
   ($('fTitle') as HTMLInputElement).value = A.song.title; ($('fBpm') as HTMLInputElement).value = String(A.song.bpm);
   $('bpmNote').textContent = A.song.bpmAuto && A.song.id ? 'Found from the drums. Tap Tap on the mixer, or type, to change it.' : '';
   $('slots').innerHTML = A.song.stems.slice(0, A.song.count).map((s, i) => `<div class="slotrow">
-      <input data-i="${i}" value="${esc(s.name)}" maxlength="12" aria-label="Track ${i + 1} name">
+      <input data-i="${i}" value="${esc(s.name)}" maxlength="24" aria-label="Track ${i + 1} name">
       <span>${s.status || (s.meta ? fmt(s.meta.dur) + (s.meta.ch === 1 ? ' mono' : '') : 'empty')}</span><button data-load="${i}">Load</button>
       ${s.meta ? `<div class="wv">${wave(s.meta.peaks)}<label>Nudge <input type="number" data-off="${i}" value="${s.meta.offset}" step="5" min="-2000" max="2000" inputmode="numeric"> ms</label><button class="share" data-wav="${i}">WAV</button></div>` : ''}</div>`).join('')
     + `<div class="slotadd">${A.song.count < A.N ? '<button id="addTrack">+ Add track</button>' : ''}${A.song.count > 4 ? '<button id="delTrack">− Remove last</button>' : ''}${A.song.cues.length ? '<button id="clearCues">Clear cues</button>' : ''}</div>`;

@@ -37,13 +37,13 @@ export function knob(svg: SVGSVGElement, o: KnobOpts) {
     svg.setAttribute('aria-valuenow', String(Math.round(v * 100)));
     if (lab && o.label) { const t = o.label(v); if (lab.textContent !== t) lab.textContent = t; }
   };
-  const sens = o.sens || 125;
+  const sens = o.sens || 60;   // px for a full turn
   control(svg, {
     down: (s, e) => { s.v0 = o.get(); (s as Gesture & { raw: number; ly: number; lt: number }).raw = s.v0; Object.assign(s, { ly: e.clientY, lt: e.timeStamp }); placeBubble(svg, text(o.get())); },
     move: (s, e) => {
       const g = s as Gesture & { raw: number; ly: number; lt: number }, dy = g.ly - e.clientY, dt = Math.max(1, e.timeStamp - g.lt);
-      const fine = Math.abs(dy) / dt < 0.12 ? 0.35 : 1;   // slow drags go fine
-      g.raw = clamp(g.raw + dy * fine / sens, 0, 1); g.ly = e.clientY; g.lt = e.timeStamp;
+      const sp = Math.abs(dy) / dt, gain = sp < 0.03 ? 0.5 : sp > 0.6 ? 1.6 : 1;   // a creep goes fine, a flick goes far
+      g.raw = clamp(g.raw + dy * gain / sens, 0, 1); g.ly = e.clientY; g.lt = e.timeStamp;
       const before = o.get(), v = q(g.raw);
       if (v !== before) { o.set(v); draw(); setBubble(text(v)); if (o.steps || (o.bi && (v - 0.5) * (before - 0.5) <= 0) || v === 0 || v === 1) tick(); }
     },
