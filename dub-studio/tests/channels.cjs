@@ -13,6 +13,7 @@ function wav(seconds, hz) {   // mono 16-bit sine
   const b = await chromium.launch({ args: ['--autoplay-policy=no-user-gesture-required'] });
   const p = await (await b.newContext({ ...devices['iPhone 15'] })).newPage();
   const errs = []; p.on('pageerror', e => errs.push(e.message)); p.on('console', m => { if (m.type() === 'error') errs.push(m.text()); });
+  await p.addInitScript(() => localStorage.setItem('dub-studio-toured', '1'));   // the tour has its own test
   await p.goto(URL);
   const names = ['Song - sax.wav', 'Song - drums.wav', 'Song - vocals.wav', 'Song - bass.wav', 'Song - guitar.wav', 'Song - piano.wav'];
   await p.setInputFiles('#startFiles', names.map((name, i) => ({ name, mimeType: 'audio/wav', buffer: wav(3, 200 + 100 * i) })));

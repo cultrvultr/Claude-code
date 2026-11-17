@@ -39,7 +39,10 @@
     </div>
   </section>
 
-  <div class="banks" id="banks" hidden><span>Channels</span><i class="on">1–4</i><i>5–8</i></div>
+  <div class="deckrow">
+    <div class="snaps" id="snaps" aria-label="Mix snapshots: hold to store, tap to recall"><span>Mix</span><i>A</i><i>B</i><i>C</i><i>D</i></div>
+    <div class="banks" id="banks" hidden><i class="on">1–4</i><i>5–8</i></div>
+  </div>
   <section class="strips" id="strips"></section>
 
   <section class="pads">
@@ -151,6 +154,7 @@
 
 <div class="sheetbg" id="helpSheet" hidden><div class="sheet scroll">
   <div class="shtop"><h2>How to play</h2><button class="x" data-x aria-label="Close">&times;</button></div>
+  <button class="wide" id="tourBtn">Take the tour</button>
   <dl class="help">
     <dt>Play</dt><dd>Starts and stops. Tap or drag the line to jump. Space bar on a keyboard.</dd>
     <dt>Loop</dt><dd>Loops 4 bars from where you are. Tap again to let it run on.</dd>
@@ -162,6 +166,7 @@
     <dt>Siren, Synare</dt><dd>Play the sound set on their pages. Higher on the Synare button hits harder. The small knob is the level.</dd>
     <dt>Echo</dt><dd>Time, Repeats (past 9 it runs away: drag below 9 to calm it), Return. Tap sets the tempo.</dd>
     <dt>FX</dt><dd>Sync or Free time, width, echo tone, echo into verb, and the reverb's type, decay and cuts.</dd>
+    <dt>Mix A B C D</dt><dd>Hold a letter to store the whole mix (faders, sends, cuts, echo and verb). Tap it to bring the mix back, mid-song.</dd>
     <dt>Rec</dt><dd>Records what you hear. Share or save it when you stop.</dd>
     <dt>Song</dt><dd>Tap the title to load your tracks (4 to 8: break out vocals, guitar, keys…), rename them and set the tempo. With more than 4, switch channels 1–4 and 5–8 above the strips.</dd>
     <dt>No sound</dt><dd>Volume up. Bluetooth headphones add delay to the pads: use wired or the speaker to play live.</dd>

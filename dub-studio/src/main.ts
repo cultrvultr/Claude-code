@@ -2,7 +2,8 @@ import '@fontsource/shrikhand/latin-400.css';
 import '@fontsource/courier-prime/latin-400.css';
 import '@fontsource/courier-prime/latin-700.css';
 import './styles.css';
-import { S, DIVS, VLC, VHC, save, popUndo, canUndo, resetMix, watchUndo, gestureStart, gestureEnd } from './state';
+import { S, DIVS, VLC, VHC, save, popUndo, canUndo, resetMix, watchUndo, gestureStart, gestureEnd, storeSnap, recallSnap, hasSnap, lastSnap } from './state';
+import { makeTour, MIXER_TOUR } from './ui/tour';
 import * as A from './audio/engine';
 import { SPECS } from './audio/irs';
 import { renderDemo } from './audio/demo';
@@ -240,6 +241,19 @@ control($('recShare'), { undoable: false, up: async () => {
   if (navigator.canShare?.({ files: [f] })) { try { await navigator.share({ files: [f], title: 'My dub' }); } catch { /* cancelled */ } }
   else { const a = document.createElement('a'); a.href = recUrl; a.download = f.name; a.click(); } } });
 
+// ---------- mix snapshots ----------
+const snapEls = [...$('snaps').querySelectorAll<HTMLElement>('i')];
+const drawSnaps = () => snapEls.forEach((el, i) => { el.classList.toggle('set', hasSnap(i)); el.classList.toggle('cur', lastSnap === i); });
+snapEls.forEach((el, i) => control(el, { undoable: false, longMs: 500,
+  long: () => { storeSnap(i); drawSnaps(); el.classList.add('flash'); setTimeout(() => el.classList.remove('flash'), 300); toast(`Mix stored in ${'ABCD'[i]}`); },
+  up: s => { if (s.long) return; if (recallSnap(i)) { applyAll(); drawSnaps(); } else toast(`Hold ${'ABCD'[i]} to store this mix`); } }));
+draws.push(drawSnaps);
+
+// ---------- tour ----------
+const tour = makeTour(p => { pages.forEach(x => { $(x).hidden = x !== p; }); if (p === 'fx') { drawFx(); drawVerb(); } });
+$('tourBtn').addEventListener('click', () => { closeSheets(); tour.open(MIXER_TOUR); });
+function firstTour() { try { if (localStorage.getItem('dub-studio-toured')) return; localStorage.setItem('dub-studio-toured', '1'); } catch { return; } setTimeout(() => tour.open(MIXER_TOUR), 900); }
+
 // ---------- the frame loop: time, position, meters ----------
 let peakHold = 0;
 function frame() {
@@ -347,7 +361,7 @@ control($('helpBtn'), { undoable: false, up: () => openSheet('helpSheet') });
 { try { const j = JSON.parse(localStorage.getItem('dub-studio-song') || 'null'); if (j) { A.song.bpm = j.bpm || 75; } } catch { /* */ } }
 const standalone = matchMedia('(display-mode: standalone)').matches || (navigator as Navigator & { standalone?: boolean }).standalone;
 if (/iPhone|iPad|iPod/.test(navigator.userAgent) && !standalone) $('install').hidden = false;
-const go = () => { $('start').hidden = true; requestAnimationFrame(redraw); };
+const go = () => { $('start').hidden = true; requestAnimationFrame(redraw); firstTour(); };
 $('goDemo').addEventListener('click', async () => { A.ensure(); go(); await loadDemo(); playToggle(); });
 $('goLoad').addEventListener('click', () => { A.ensure(); ($('startFiles') as HTMLInputElement).click(); });
 $('startFiles').addEventListener('change', e => { const i = e.target as HTMLInputElement; const fs = [...(i.files || [])]; i.value = ''; if (fs.length) { go(); loadMany(fs); } });
@@ -357,3 +371,5 @@ function fit() { const big = innerWidth >= 700 && innerHeight >= 700, z = big ? 
 fit(); addEventListener('resize', fit);
 redraw(); icon(); drawLoop(); save();
 (window as unknown as { __dub: unknown }).__dub = { meters: A.meters };   // read by the end-to-end tests
+// offline: the service worker caches the app as it loads (production builds only)
+if (import.meta.env.PROD && 'serviceWorker' in navigator) addEventListener('load', () => navigator.serviceWorker.register('./sw.js').catch(() => {}));
