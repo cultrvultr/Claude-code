@@ -8,6 +8,7 @@ import * as A from './audio/engine';
 import { SPECS } from './audio/irs';
 import { renderDemo } from './audio/demo';
 import * as Store from './loader/store';
+import * as Split from './split/split';
 import { control, guardPage, clamp, xFrac } from './ui/control';
 import { knob, fader, bar, seg } from './ui/widgets';
 
@@ -410,6 +411,41 @@ $('fBpm').addEventListener('change', e => { const v = +(e.target as HTMLInputEle
 draws.push(() => { $('songBtn').textContent = A.song.title || 'Load tracks'; });
 control($('songBtn'), { undoable: false, up: () => { slotsDraw(); openSheet('songSheet'); } });
 
+// ---------- splitter ----------
+let splitting = false;
+const mmss = (s: number) => s >= 60 ? `${Math.floor(s / 60)} min ${Math.round(s % 60)} s` : `${Math.round(s)} s`;
+async function openSplit() {
+  slotsDraw(); closeSheets(); openSheet('splitSheet'); $('splitRun').hidden = !splitting;
+  $('splitModel').textContent = (await Split.modelSaved()) ? 'The splitter model is saved on this phone.' : `The first split downloads the splitter model: ${Split.MODEL_MB} MB, once. Use Wi-Fi.`;
+}
+async function runSplit(f: File) {
+  await A.ensure(); splitting = true; $('splitRun').hidden = false; ($('splitPick') as HTMLButtonElement).disabled = true;
+  const fill = $('splitBar').querySelector<HTMLElement>('.fill')!, st = $('splitStatus');
+  newSong(6, base(f)); keepAwake(); redraw();
+  const id = A.song.id;
+  try {
+    const r = await Split.splitFile(f, id, p => {
+      if (p.stage === 'decode') { fill.style.width = '2%'; st.textContent = 'Reading the song…'; }
+      if (p.stage === 'model') { fill.style.width = (p.done / p.total * 100).toFixed(1) + '%'; st.textContent = `Downloading the model: ${Math.round(p.done / 1e6)} of ${Math.round(p.total / 1e6)} MB`; }
+      if (p.stage === 'load') { fill.style.width = '100%'; st.textContent = 'Starting the splitter…'; }
+      if (p.stage === 'split') { fill.style.width = (p.done / p.total * 100).toFixed(1) + '%'; st.textContent = `Splitting: ${Math.round(p.done / p.total * 100)}%` + (p.eta !== undefined ? ` · about ${mmss(p.eta)} left` : '') + (p.ep === 'wasm' ? ' (no GPU: slower)' : ''); }
+    });
+    if (A.song.id !== id) return;
+    A.song.sr = 44100; A.song.title = base(f);
+    r.stems.forEach((o, i) => { const slot = Split.SLOTS[i]; A.song.stems[slot].meta = { name: Split.SOURCES[i], n: o.n, ch: o.ch, dur: o.dur, peaks: o.peaks, ms: o.ms, offset: 0, file: f.name }; A.song.stems[slot].name = Split.SOURCES[i]; });
+    onsetsBy.set(0, { on: r.stems[0].onsets, hop: r.stems[0].hop });
+    finishSong(); closeSheets(); toast(`Split in ${mmss(r.secs)}${A.song.bpmAuto ? ` · ${A.song.bpm} BPM` : ''}`, 4000);
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    await Store.deleteSong(id); if (A.song.id === id) newSong(4, '', '');
+    redraw(); toast(msg === 'cancelled' ? 'Split cancelled' : 'Could not split: ' + msg, 5000);
+  } finally { splitting = false; $('splitRun').hidden = true; ($('splitPick') as HTMLButtonElement).disabled = false; letSleep(); }
+}
+control($('splitBtn'), { undoable: false, up: openSplit });
+$('splitPick').addEventListener('click', () => ($('splitFile') as HTMLInputElement).click());
+$('splitFile').addEventListener('change', e => { const i = e.target as HTMLInputElement; const f = i.files?.[0]; i.value = ''; if (f) runSplit(f); });
+$('splitCancel').addEventListener('click', () => Split.cancelSplit());
+
 // ---------- cues: hold Loop to drop one at the playhead; taps on the line snap to them ----------
 function drawCues() {
   const d = A.dur() || 1, pr = $('prog'); pr.querySelectorAll('.cue').forEach(x => x.remove());
@@ -434,6 +470,7 @@ if (/iPhone|iPad|iPod/.test(navigator.userAgent) && !standalone) $('install').hi
 const go = () => { $('start').hidden = true; requestAnimationFrame(redraw); firstTour(); };
 $('goDemo').addEventListener('click', async () => { A.ensure(); go(); await loadDemo(); playToggle(); });
 $('goLoad').addEventListener('click', () => { A.ensure(); ($('startFiles') as HTMLInputElement).click(); });
+$('goSplit').addEventListener('click', () => { A.ensure(); go(); openSplit(); });
 $('startFiles').addEventListener('change', e => { const i = e.target as HTMLInputElement; const fs = [...(i.files || [])]; i.value = ''; if (fs.length) { go(); loadMany(fs); } });
 if (navigator.storage?.persist) navigator.storage.persisted().then(p => { if (!p && standalone) navigator.storage.persist(); }).catch(() => {});
 

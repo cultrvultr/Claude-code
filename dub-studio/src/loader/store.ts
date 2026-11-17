@@ -7,7 +7,8 @@ export const SEG = 10;   // seconds per piece
 export interface StemMeta { name: string; n: number; ch: number; dur: number; peaks: number[]; ms: number; offset: number; file?: string }
 export interface SongMeta { id: string; title: string; bpm: number; bpmAuto?: boolean; sr: number; seg: number; gain: number; stems: (StemMeta | null)[]; cues: number[]; created: number; played?: number }
 
-const mem = new Map<string, Int16Array[]>();   // `${songId}/${stem}` -> pieces, when OPFS is not there
+const mem = new Map<string, (Int16Array | null)[]>();   // `${songId}/${stem}` -> pieces OPFS could not take (null: that one is in OPFS)
+export function adoptPieces(songId: string, stem: number, pieces: (Int16Array | null)[]) { mem.set(`${songId}/${stem}`, pieces); }
 let worker: Worker | null = null, nextId = 1;
 const waiting = new Map<number, (r: PieceResult) => void>();
 function w(): Worker {
@@ -33,7 +34,7 @@ async function songDir(songId: string, create = false) {
 }
 
 export async function readPiece(songId: string, stem: number, k: number): Promise<Int16Array | null> {
-  const m = mem.get(`${songId}/${stem}`); if (m) return m[k] || null;
+  const m = mem.get(`${songId}/${stem}`); if (m && m[k]) return m[k];
   try { const d = await (await songDir(songId)).getDirectoryHandle('s' + stem); const f = await (await d.getFileHandle(k + '.pcm')).getFile(); return new Int16Array(await f.arrayBuffer()); }
   catch { return null; }
 }

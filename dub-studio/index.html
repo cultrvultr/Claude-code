@@ -128,6 +128,7 @@
     <button id="goDemo" class="go">Play the demo</button>
     <button id="goLast" class="go" hidden>Continue <span></span></button>
     <button id="goLoad" class="go alt">Load your tracks</button>
+    <button id="goSplit" class="go alt">Split a song into parts</button>
     <input type="file" id="startFiles" accept="audio/*,.mp3,.m4a,.wav,.aif,.aiff,.flac,.ogg" multiple hidden>
     <p class="install" id="install" hidden>Add to your Home Screen to keep your songs: tap <b>Share</b>, then <b>Add to Home Screen</b>.</p>
   </div>
@@ -141,10 +142,26 @@
   <p class="note" id="bpmNote"></p>
   <div id="slots"></div>
   <button class="wide" id="loadAll">Load 4 to 8 files at once</button>
+  <button class="wide" id="splitBtn">Split a full song into parts</button>
   <button class="wide alt" id="loadDemo">Load the demo song</button>
   <p class="note">Songs bought or streamed in Apple Music are copy protected and can't be loaded. Use files from the Files app, AirDrop or Voice Memos.</p>
   <input type="file" id="oneFile" accept="audio/*,.mp3,.m4a,.wav,.aif,.aiff,.flac,.ogg" hidden>
   <input type="file" id="allFiles" accept="audio/*,.mp3,.m4a,.wav,.aif,.aiff,.flac,.ogg" multiple hidden>
+</div></div>
+
+<div class="sheetbg" id="splitSheet" hidden><div class="sheet scroll">
+  <div class="shtop"><h2>Split a song</h2><button class="x" data-x aria-label="Close">&times;</button></div>
+  <p>Pick a full mix. It is split on this phone into six parts: <b>Drums, Bass, Other, Vocals, Guitar</b> and <b>Keys</b>, ready to dub.</p>
+  <p class="note" id="splitModel"></p>
+  <button class="wide" id="splitPick">Choose a song</button>
+  <div class="splitrun" id="splitRun" hidden>
+    <div class="bar" id="splitBar"><div class="fill"></div></div>
+    <p class="splitstat" id="splitStatus"></p>
+    <p class="note">Keep Dub Studio open and the screen on. A 4-minute song takes a few minutes on a recent iPhone.</p>
+    <button class="wide alt" id="splitCancel">Cancel</button>
+  </div>
+  <p class="note">Separation by htdemucs_6s (Meta's Demucs, MIT licence). It is very good, not perfect: some bleed between parts is normal.</p>
+  <input type="file" id="splitFile" accept="audio/*,.mp3,.m4a,.wav,.aif,.aiff,.flac,.ogg" hidden>
 </div></div>
 
 <div class="sheetbg" id="recSheet" hidden><div class="sheet">
@@ -171,6 +188,7 @@
     <dt>Mix A B C D</dt><dd>Hold a letter to store the whole mix (faders, sends, cuts, echo and verb). Tap it to bring the mix back, mid-song.</dd>
     <dt>Rec</dt><dd>Records what you hear. Share or save it when you stop.</dd>
     <dt>Nudge</dt><dd>In the Song sheet, each track has a Nudge in milliseconds to line up parts that were exported a little early or late.</dd>
+    <dt>Split</dt><dd>No stems? Split a full song into Drums, Bass, Other, Vocals, Guitar and Keys right on the phone (Song sheet or start screen). The first time downloads the 285 MB model: use Wi-Fi.</dd>
     <dt>Song</dt><dd>Tap the title to load your tracks (4 to 8: break out vocals, guitar, keys…), rename them and set the tempo. With more than 4, switch channels 1–4 and 5–8 above the strips.</dd>
     <dt>No sound</dt><dd>Volume up. Bluetooth headphones add delay to the pads: use wired or the speaker to play live.</dd>
   </dl>

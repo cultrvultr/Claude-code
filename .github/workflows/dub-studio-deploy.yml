@@ -29,6 +29,13 @@ jobs:
           cache-dependency-path: dub-studio/package-lock.json
 
       - run: npm ci
+
+      # the stem splitter model (285 MB, pinned and checksummed in scripts/prepare-assets.mjs)
+      - uses: actions/cache@v4
+        with:
+          path: dub-studio/node_modules/.cache/htdemucs_6s.onnx
+          key: htdemucs6s-a3f5050696cd
+
       - run: npm run build
 
       # Production branch of the Pages project is "main"; deploying under that name publishes to dub-studio-7il.pages.dev
