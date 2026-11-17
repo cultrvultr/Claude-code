@@ -13,7 +13,9 @@ import { S, DIVS, HPF, LPF, VLC, VHC } from '../state';
 import { makeIR, shaped, type IR } from './irs';
 
 export interface Stem { name: string; buffer: AudioBuffer | null; file?: string }
-export interface Song { title: string; bpm: number; stems: Stem[] }
+export interface Song { title: string; bpm: number; stems: Stem[]; count: number }
+export const N = 8;   // channels on the desk; the strips show song.count of them
+export const DEFAULT_NAMES = ['Drums', 'Bass', 'Other', 'Vocals', 'Guitar', 'Keys', 'Horns', 'FX'];
 
 const FMIN = 70, FMAX = 2500;
 export const xToHz = (x: number) => FMIN * Math.pow(FMAX / FMIN, x);
@@ -21,9 +23,9 @@ const qdb = (q: number) => 20 * Math.log10(q);   // Web Audio's LP/HP Q is in dB
 const T9 = { lp: 0.713, hp: 1 / 0.713, q: 2.55, far: 16.8 };   // stepped-filter voicing: resonant pair + far pole
 
 interface Ch { inp: GainNode; hp1: BiquadFilterNode; hp2: BiquadFilterNode; lp1: BiquadFilterNode; lp2: BiquadFilterNode;
-  clean: GainNode; crunch: GainNode; fader: GainNode; mute: GainNode; kill: GainNode; echo: GainNode; throwG: GainNode; verb: GainNode; meter: AnalyserNode }
+  clean: GainNode; crunch: GainNode; fader: GainNode; mute: GainNode; solo: GainNode; echo: GainNode; throwG: GainNode; verb: GainNode; meter: AnalyserNode }
 
-export const song: Song = { title: '', bpm: 75, stems: ['Drums', 'Bass', 'Other', 'Vocals'].map(name => ({ name, buffer: null })) };
+export const song: Song = { title: '', bpm: 75, count: 4, stems: DEFAULT_NAMES.map(name => ({ name, buffer: null })) };
 export let ctx: AudioContext | null = null;
 let master: GainNode, limiter: DynamicsCompressorNode, masterMeter: AnalyserNode;
 let echoBus: GainNode, echoRet: GainNode, echoVerb: GainNode, verbIn: GainNode, conv: ConvolverNode, vLc: BiquadFilterNode, vHc: BiquadFilterNode, vRet: GainNode;
@@ -70,18 +72,19 @@ async function build() {
   echoRet = c.createGain(); echoRet.connect(master);
   echoVerb = c.createGain(); echoVerb.connect(verbIn);
   const curve = crunchCurve();
-  for (let i = 0; i < 4; i++) {
+  for (let i = 0; i < N; i++) {
     const g = () => c.createGain(), bq = (type: BiquadFilterType, f: number, q: number) => { const b = c.createBiquadFilter(); b.type = type; b.frequency.value = f; b.Q.value = qdb(q); return b; };
-    const inp = g(), clean = g(), crunch = g(), shIn = g(), sum = g(), fader = g(), mute = g(), kill = g(), echo = g(), throwG = g(), verb = g();
+    const inp = g(), clean = g(), crunch = g(), shIn = g(), sum = g(), fader = g(), mute = g(), solo = g(), echo = g(), throwG = g(), verb = g();
     const sh = c.createWaveShaper(); sh.curve = curve; sh.oversample = '2x'; shIn.gain.value = 1 / 1.6; crunch.gain.value = 0; echo.gain.value = 0; throwG.gain.value = 0; verb.gain.value = 0;
     const hp1 = bq('highpass', 10, 0.707), hp2 = bq('highpass', 10, 0.5), lp1 = bq('lowpass', 22000, 0.707), lp2 = bq('lowpass', 22000, 0.5);
     const meter = c.createAnalyser(); meter.fftSize = 512;
     inp.connect(clean); clean.connect(sum); inp.connect(shIn); shIn.connect(sh); sh.connect(crunch); crunch.connect(sum);
-    sum.connect(hp1); hp1.connect(hp2); hp2.connect(lp1); lp1.connect(lp2); lp2.connect(fader); fader.connect(mute); mute.connect(kill);
-    kill.connect(master); kill.connect(meter); kill.connect(verb); verb.connect(verbIn); kill.connect(echo); echo.connect(echoBus); kill.connect(throwG); throwG.connect(echoBus);
-    ch.push({ inp, hp1, hp2, lp1, lp2, clean, crunch, fader, mute, kill, echo, throwG, verb, meter });
+    sum.connect(hp1); hp1.connect(hp2); hp2.connect(lp1); lp1.connect(lp2); lp2.connect(fader); fader.connect(mute); mute.connect(solo);
+    solo.connect(master); solo.connect(meter); solo.connect(verb); verb.connect(verbIn); solo.connect(echo); echo.connect(echoBus); solo.connect(throwG); throwG.connect(echoBus);
+    ch.push({ inp, hp1, hp2, lp1, lp2, clean, crunch, fader, mute, solo, echo, throwG, verb, meter });
   }
-  for (let i = 0; i < 4; i++) for (const p of ['cut', 'fader', 'mute', 'echo', 'verb'] as const) applyChan(i, p);
+  for (let i = 0; i < N; i++) for (const p of ['cut', 'fader', 'mute', 'echo', 'verb'] as const) applyChan(i, p);
+  applySolo();
   try {
     await c.audioWorklet.addModule(workletUrl);
     rig = new AudioWorkletNode(c, 'dub-rig', { numberOfInputs: 1, numberOfOutputs: 2, outputChannelCount: [2, 2], channelCount: 2, channelCountMode: 'explicit' });
@@ -107,7 +110,8 @@ export function applyChan(i: number, p: 'cut' | 'fader' | 'mute' | 'echo' | 'ver
   }
 }
 export function setThrow(i: number, on: boolean) { if (ctx) ramp(ch[i].throwG.gain, on ? 1 : 0, on ? 0.006 : 0.03); }
-export function setKill(i: number, on: boolean) { if (ctx) ramp(ch[i].kill.gain, on ? 0 : 1, 0.006); }
+// solo: when any channel is soloed, the others are silenced (sends too, since the gate sits before them)
+export function applySolo() { if (!ctx) return; const any = S.ch.some(c => c.solo); S.ch.forEach((c, i) => ramp(ch[i].solo.gain, any && !c.solo ? 0 : 1, 0.008)); }
 
 // ---------- echo and instruments ----------
 export const dlyMs = () => S.m.sync ? 60000 / song.bpm * DIVS[S.m.div][1] : 60 + 540 * S.m.dly;
@@ -163,7 +167,7 @@ export function play(at = pos0) {
   if (!ctx) return; stopSources(); const d = dur(); if (!d) return;
   if (at >= d - 0.05) at = 0;
   pos0 = at; t0 = ctx.currentTime + 0.05;
-  for (let i = 0; i < 4; i++) {
+  for (let i = 0; i < N; i++) {
     const b = song.stems[i].buffer; if (!b) continue;
     const s = ctx.createBufferSource(), g = ctx.createGain(); s.buffer = b;
     if (loop.on && loop.b > loop.a && at < loop.b) { s.loop = true; s.loopStart = loop.a; s.loopEnd = Math.min(loop.b, b.duration); }

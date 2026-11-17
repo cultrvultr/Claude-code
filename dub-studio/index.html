@@ -39,6 +39,7 @@
     </div>
   </section>
 
+  <div class="banks" id="banks" hidden><span>Channels</span><i class="on">1–4</i><i>5–8</i></div>
   <section class="strips" id="strips"></section>
 
   <section class="pads">
@@ -134,7 +135,7 @@
   <label class="fld"><span>Title</span><input id="fTitle" type="text" maxlength="60"></label>
   <label class="fld"><span>Tempo (BPM)</span><input id="fBpm" type="number" min="40" max="220" step="0.1" inputmode="decimal"></label>
   <div id="slots"></div>
-  <button class="wide" id="loadAll">Load 4 files at once</button>
+  <button class="wide" id="loadAll">Load 4 to 8 files at once</button>
   <button class="wide alt" id="loadDemo">Load the demo song</button>
   <p class="note">Songs bought or streamed in Apple Music are copy protected and can't be loaded. Use files from the Files app, AirDrop or Voice Memos.</p>
   <input type="file" id="oneFile" accept="audio/*,.mp3,.m4a,.wav,.aif,.aiff,.flac,.ogg" hidden>
@@ -157,14 +158,19 @@
     <dt>Cut</dt><dd>The stepped filter. Up cuts the bass (high pass), down cuts the top (low pass). Double tap for off.</dd>
     <dt>Echo, Verb</dt><dd>Send the part into the tape echo or the reverb. Double tap for zero.</dd>
     <dt>Throw</dt><dd>Hold to send the whole part into the echo. Let go and the echoes ring on.</dd>
-    <dt>Mute</dt><dd>Tap to drop the part out. Hold to kill it only while held.</dd>
+    <dt>Mute, Solo</dt><dd>Tap to drop the part out. Press and hold to solo it (the button turns green): only soloed parts play. Tap a soloed button to un-solo.</dd>
     <dt>Siren, Synare</dt><dd>Play the sound set on their pages. Higher on the Synare button hits harder. The small knob is the level.</dd>
     <dt>Echo</dt><dd>Time, Repeats (past 9 it runs away: drag below 9 to calm it), Return. Tap sets the tempo.</dd>
     <dt>FX</dt><dd>Sync or Free time, width, echo tone, echo into verb, and the reverb's type, decay and cuts.</dd>
     <dt>Rec</dt><dd>Records what you hear. Share or save it when you stop.</dd>
-    <dt>Song</dt><dd>Tap the title to load your four tracks, rename them and set the tempo.</dd>
+    <dt>Song</dt><dd>Tap the title to load your tracks (4 to 8: break out vocals, guitar, keys…), rename them and set the tempo. With more than 4, switch channels 1–4 and 5–8 above the strips.</dd>
     <dt>No sound</dt><dd>Volume up. Bluetooth headphones add delay to the pads: use wired or the speaker to play live.</dd>
   </dl>
+  <div class="credit">
+    <h3>With thanks</h3>
+    <p>The idea and the concept come from the <b>4 Track Pocket Dub Studio</b> by Kibir La Amlak: a beautiful way to dub a song live on your phone. Thank you for the inspiration. Go and play the original, with its own song and hand-built echo, siren and Synare:</p>
+    <a href="https://www.kibir-la-amlak.com/dubstudio/" target="_blank" rel="noopener">kibir-la-amlak.com/dubstudio</a>
+  </div>
 </div></div>
 
 <div id="toast" role="status" hidden></div>

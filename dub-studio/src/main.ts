@@ -21,7 +21,7 @@ function toast(msg: string, ms = 2600) { const t = $('toast'); t.textContent = m
 // ---------- channel strips ----------
 const cutLab = (st: number) => { const hz = (f: number) => f >= 1000 ? f / 1000 + 'K' : String(f); return st === 0 ? 'Cut' : st < 0 ? 'LP ' + hz([10000, 8000, 6000, 5000, 4000, 3000, 2000, 1000, 500, 250][-st - 1]) : 'HP ' + hz([70, 100, 150, 250, 500, 1000, 2000, 3000, 5000, 7500][st - 1]); };
 const strips = $('strips');
-for (let c = 0; c < 4; c++) strips.insertAdjacentHTML('beforeend', `<div class="st" data-c="${c}">
+for (let c = 0; c < A.N; c++) strips.insertAdjacentHTML('beforeend', `<div class="st" data-c="${c}">
   <button class="slot" data-c="${c}"></button>
   <div class="k"><span class="kv">Cut</span><svg class="kn" data-p="cut"></svg></div>
   <div class="k"><span class="kv">Echo</span><svg class="kn" data-p="echo"></svg></div>
@@ -29,6 +29,7 @@ for (let c = 0; c < 4; c++) strips.insertAdjacentHTML('beforeend', `<div class="
   <div class="fd"><div class="tr"></div><div class="lv"></div><div class="mt"><i></i></div><div class="cap"></div></div>
   <button class="throw">Throw</button><button class="mute">Mute</button></div>`);
 const meterEls: HTMLElement[] = [];
+const muteDraws: (() => void)[] = [], faderDraws: (() => void)[] = [];
 document.querySelectorAll<HTMLElement>('.st').forEach(st => {
   const c = +st.dataset.c!, q = S.ch[c];
   const [kc, ke, kv] = [...st.querySelectorAll<SVGSVGElement>('.kn')];
@@ -36,19 +37,32 @@ document.querySelectorAll<HTMLElement>('.st').forEach(st => {
   draws.push(knob(ke, { get: () => q.echo, set: v => { q.echo = v; A.applyChan(c, 'echo'); }, home: 0 }));
   draws.push(knob(kv, { get: () => q.verb, set: v => { q.verb = v; A.applyChan(c, 'verb'); }, home: 0 }));
   const fd = st.querySelector<HTMLElement>('.fd')!;
-  const df = fader(fd, () => q.fader, v => { q.fader = v; A.applyChan(c, 'fader'); }); draws.push(df); addEventListener('resize', df);
+  const df = fader(fd, () => q.fader, v => { q.fader = v; A.applyChan(c, 'fader'); }); draws.push(df); faderDraws.push(df); addEventListener('resize', df);
   meterEls.push(st.querySelector<HTMLElement>('.mt i')!);
   const th = st.querySelector<HTMLElement>('.throw')!;
   control(th, { undoable: false, down: async () => { await A.ensure(); A.setThrow(c, true); th.classList.add('on'); }, up: () => { A.setThrow(c, false); th.classList.remove('on'); } });
-  // Mute: tap toggles; hold kills only while held
+  // Mute: tap toggles mute; a long press toggles solo (green)
   const mu = st.querySelector<HTMLElement>('.mute')!;
-  const dm = () => mu.classList.toggle('on', q.mute); draws.push(dm);
-  control(mu, { long: () => { A.setKill(c, true); mu.classList.add('kill'); }, longMs: 250,
-    up: s => { if (s.long) { A.setKill(c, false); mu.classList.remove('kill'); } else { q.mute = !q.mute; A.applyChan(c, 'mute'); dm(); } } });
+  const dm = () => { mu.classList.toggle('on', q.mute && !q.solo); mu.classList.toggle('solo', q.solo); mu.textContent = q.solo ? 'Solo' : 'Mute'; };
+  draws.push(dm); muteDraws.push(dm);
+  control(mu, { long: () => { q.solo = !q.solo; A.applySolo(); muteDraws.forEach(f => f()); }, longMs: 400,
+    up: s => { if (s.long) return; if (q.solo) { q.solo = false; A.applySolo(); } else { q.mute = !q.mute; A.applyChan(c, 'mute'); } muteDraws.forEach(f => f()); } });
   const slot = st.querySelector<HTMLElement>('.slot')!;
-  draws.push(() => { const s = A.song.stems[c]; slot.textContent = s.name; slot.classList.toggle('empty', !s.buffer); });
+  draws.push(() => { const s = A.song.stems[c]; slot.textContent = s.name; slot.classList.toggle('empty', !s.buffer); st.hidden = c >= A.song.count; });
   control(slot, { undoable: false, up: () => pickOne(c) });
 });
+// banks: phones show 4 strips at a time; 1-4 / 5-8 switches when there are more than 4 tracks
+let bank = 0;
+function drawBank() {
+  const many = A.song.count > 4, wide = innerWidth >= 700;
+  $('banks').hidden = !many || wide; strips.style.setProperty('--cols', String(wide ? A.song.count : 4));
+  if (!many || wide) bank = 0;
+  strips.querySelectorAll<HTMLElement>('.st').forEach((st, c) => st.classList.toggle('off', !wide && many && Math.floor(c / 4) !== bank));
+  $('banks').querySelectorAll<HTMLElement>('i').forEach((b, i) => { b.classList.toggle('on', i === bank); b.textContent = i ? `5–${A.song.count}` : '1–4'; });
+  requestAnimationFrame(() => faderDraws.forEach(f => f()));
+}
+$('banks').querySelectorAll<HTMLElement>('i').forEach((b, i) => control(b, { undoable: false, down: () => { bank = i; drawBank(); requestAnimationFrame(redraw); } }));
+draws.push(drawBank); addEventListener('resize', drawBank);
 
 // ---------- Siren and Synare pads ----------
 const strike = (u: number) => Math.pow(0.31 + 0.69 * u, 2);
@@ -207,7 +221,7 @@ control($('loopBtn'), { undoable: false, down: () => {
 // undo and reset
 const drawUndo = () => { ($('undoBtn') as HTMLButtonElement).disabled = !canUndo(); };
 watchUndo(drawUndo); drawUndo();
-const applyAll = () => { for (let c = 0; c < 4; c++) for (const p of ['cut', 'fader', 'mute', 'echo', 'verb'] as const) A.applyChan(c, p); A.applyEcho(); A.applyVerb(); A.setVerbIR(); redraw(); };
+const applyAll = () => { A.applySolo(); for (let c = 0; c < A.N; c++) for (const p of ['cut', 'fader', 'mute', 'echo', 'verb'] as const) A.applyChan(c, p); A.applyEcho(); A.applyVerb(); A.setVerbIR(); redraw(); };
 control($('undoBtn'), { undoable: false, down: () => { if (popUndo()) applyAll(); } });
 control($('resetBtn'), { undoable: false, long: () => { resetMix(); applyAll(); toast('Mix reset'); }, longMs: 500, up: s => { if (!s.long) toast('Hold Reset to clear the channels'); } });
 
@@ -263,31 +277,40 @@ function latencyCheck() { if (latencyShown) return; setTimeout(() => { const l =
 
 // ---------- songs: load files, the demo, the Song sheet ----------
 function saveSong() { try { localStorage.setItem('dub-studio-song', JSON.stringify({ title: A.song.title, bpm: A.song.bpm, names: A.song.stems.map(s => s.name) })); } catch { /* */ } }
-const ROLE: [RegExp, string][] = [[/drum|perc|beat|kit/i, 'Drums'], [/bass/i, 'Bass'], [/vox|vocal|voice|sing/i, 'Vocals']];
+// file names to slots: each role has its home channel (see DEFAULT_NAMES)
+const ROLE: [RegExp, number][] = [[/drum|perc|beat|kit/i, 0], [/bass/i, 1], [/other|inst|music|backing/i, 2], [/vox|vocal|voice|sing|acap/i, 3],
+  [/guit|gtr/i, 4], [/key|piano|organ|synth|pad/i, 5], [/horn|brass|sax|trump|tromb|flute|melod/i, 6], [/fx|sfx|effect|noise/i, 7]];
+const roleOf = (f: File) => ROLE.find(([r]) => r.test(f.name))?.[1] ?? -1;
 const base = (f: File) => f.name.replace(/\.[^.]+$/, '');
 async function loadInto(c: number, f: File) {
   const s = A.song.stems[c]; s.name = '…'; redraw();
-  try { s.buffer = await A.decodeFile(f); s.file = f.name; s.name = (ROLE.find(([r]) => r.test(f.name))?.[1]) || base(f).slice(0, 10); }
+  try { s.buffer = await A.decodeFile(f); s.file = f.name; const r = roleOf(f); s.name = r >= 0 ? A.DEFAULT_NAMES[r] : base(f).slice(0, 10); }
   catch { s.buffer = null; s.name = 'Track ' + (c + 1); toast(`Could not read ${f.name}. Protected (Apple Music) or unsupported file.`, 4500); }
   redraw(); slotsDraw(); drawLoop();
 }
-async function loadMany(files: File[]) {
-  if (!files.length) return; const fs = files.slice(0, 4), order: (File | null)[] = [null, null, null, null], rest: File[] = [];
-  for (const f of fs) { const k = ROLE.findIndex(([r]) => r.test(f.name)); const slot = k === 2 ? 3 : k; if (k >= 0 && !order[slot]) order[slot] = f; else rest.push(f); }
-  for (let i = 0; i < 4 && rest.length; i++) if (!order[i]) order[i] = rest.shift()!;
+function clearSong(count: number) {
   if (A.playing) { A.stop(); icon(); }
-  A.loop.on = false; A.seek(0);
-  if (!A.song.title || A.song.title.includes('demo')) A.song.title = commonName(fs);
+  A.loop.on = false; A.seek(0); A.song.count = count;
+  A.song.stems.forEach((s, i) => { s.buffer = null; s.file = undefined; s.name = A.DEFAULT_NAMES[i]; });
+  S.ch.forEach(c => { c.solo = false; c.mute = false; }); A.applySolo(); for (let c = 0; c < A.N; c++) A.applyChan(c, 'mute');
+}
+async function loadMany(files: File[]) {
+  if (!files.length) return;
+  const fs = files.slice(0, A.N), count = Math.max(4, fs.length), order: (File | null)[] = Array(count).fill(null), rest: File[] = [];
+  if (files.length > A.N) toast(`Up to ${A.N} tracks: the first ${A.N} were loaded`, 4000);
+  for (const f of fs) { const r = roleOf(f); if (r >= 0 && r < count && !order[r]) order[r] = f; else rest.push(f); }
+  for (let i = 0; i < count && rest.length; i++) if (!order[i]) order[i] = rest.shift()!;
+  clearSong(count);
+  A.song.title = commonName(fs);
   await Promise.all(order.map((f, i) => f ? loadInto(i, f) : Promise.resolve()));
-  saveSong(); media(); toast(`Loaded ${fs.length} track${fs.length > 1 ? 's' : ''}`);
+  redraw(); saveSong(); media(); toast(`Loaded ${fs.length} track${fs.length > 1 ? 's' : ''}`);
 }
 function commonName(fs: File[]) { const n = fs.map(base); let p = n[0] || ''; for (const x of n) while (!x.startsWith(p)) p = p.slice(0, -1); p = p.replace(/[\s_\-.(]+$/, ''); return p.length > 2 ? p : 'My song'; }
 async function loadDemo() {
   await A.ensure(); toast('Mixing the demo riddim…');
   await new Promise(r => setTimeout(r, 30));
   const d = renderDemo(A.ctx!.sampleRate);
-  if (A.playing) { A.stop(); icon(); }
-  A.loop.on = false; A.seek(0);
+  clearSong(4);
   d.data.forEach((x, i) => { A.song.stems[i] = { name: d.names[i], buffer: A.bufferFrom(x) }; });
   A.song.title = d.title; A.song.bpm = d.bpm; echoChange(); saveSong(); redraw(); slotsDraw(); drawLoop(); media();
 }
@@ -301,9 +324,13 @@ control($('loadDemo'), { undoable: false, up: () => { closeSheets(); loadDemo();
 
 function slotsDraw() {
   ($('fTitle') as HTMLInputElement).value = A.song.title; ($('fBpm') as HTMLInputElement).value = String(A.song.bpm);
-  $('slots').innerHTML = A.song.stems.map((s, i) => `<div class="slotrow"><input data-i="${i}" value="${s.name.replace(/"/g, '&quot;')}" maxlength="12" aria-label="Track ${i + 1} name"><span>${s.buffer ? fmt(s.buffer.duration) : 'empty'}</span><button data-load="${i}">Load</button></div>`).join('');
+  $('slots').innerHTML = A.song.stems.slice(0, A.song.count).map((s, i) => `<div class="slotrow"><input data-i="${i}" value="${s.name.replace(/"/g, '&quot;')}" maxlength="12" aria-label="Track ${i + 1} name"><span>${s.buffer ? fmt(s.buffer.duration) : 'empty'}</span><button data-load="${i}">Load</button></div>`).join('')
+    + `<div class="slotadd">${A.song.count < A.N ? '<button id="addTrack">+ Add track</button>' : ''}${A.song.count > 4 ? '<button id="delTrack">− Remove last</button>' : ''}</div>`;
   $('slots').querySelectorAll<HTMLInputElement>('input').forEach(inp => inp.addEventListener('input', () => { A.song.stems[+inp.dataset.i!].name = inp.value || '—'; redraw(); saveSong(); }));
   $('slots').querySelectorAll<HTMLElement>('[data-load]').forEach(b => b.addEventListener('click', () => pickOne(+b.dataset.load!)));
+  document.getElementById('addTrack')?.addEventListener('click', () => { A.song.count++; bank = Math.floor((A.song.count - 1) / 4); slotsDraw(); redraw(); saveSong(); });
+  document.getElementById('delTrack')?.addEventListener('click', () => { const i = --A.song.count; const st = A.song.stems[i]; st.buffer = null; st.name = A.DEFAULT_NAMES[i];
+    S.ch[i].solo = false; A.applySolo(); if (A.playing) A.play(A.now()); slotsDraw(); redraw(); saveSong(); });
 }
 $('fTitle').addEventListener('input', e => { A.song.title = (e.target as HTMLInputElement).value; $('songBtn').textContent = A.song.title || 'Untitled'; saveSong(); media(); });
 $('fBpm').addEventListener('change', e => { const v = +(e.target as HTMLInputElement).value; if (v >= 40 && v <= 220) { A.song.bpm = v; echoChange(); saveSong(); } });
