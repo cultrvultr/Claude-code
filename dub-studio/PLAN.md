@@ -167,6 +167,23 @@ Goal: drop in one full mix, get 4 stems in the 4 slots.
 
 ---
 
+## 4b. User experience additions
+
+| # | Item | Phase |
+|---|---|---|
+| 1 | **Record and share**: record the master (MediaRecorder or worklet tap → WAV/AAC), save takes, share via `navigator.share` to Files / Instagram | 1 (record), 4 (takes in library) |
+| 2 | **Demo song on first launch**: a 4-stem riddim generated in the browser (CC0 by construction), swapped for a recorded CC0 song later | 1 |
+| 3 | **Add to Home Screen prompt** + `navigator.storage.persist()`: Safari can wipe data after ~7 days unused unless installed | 1 (prompt), 4 (persist) |
+| 4 | **Apple Music DRM notice**: protected tracks can't load; point to Files, AirDrop, Voice Memos | 2 |
+| 5 | **Throw and kill buttons**: hold-to-send (echo throw) and hold-to-mute per channel | 1 |
+| 6 | **Meters**: per-channel and master level, clip light | 1 |
+| 7 | **Loop region and cue points**: set A/B loop, drop cues, jump to them | 2 |
+| 8 | **Undo, reset mix, mix snapshots** (A/B/C/D quick recall) | 1 (reset, undo), 4 (named snapshots) |
+| 9 | **Lock screen controls** (Media Session API) and clear "audio paused by lock" state | 1 |
+| 10 | **Bluetooth latency notice**: suggest wired or speaker for live pads; show measured `outputLatency` | 1 |
+| 11 | **Tap tempo** fallback for echo Sync | 1 |
+| 12 | **Splitter expectations**: time estimate, wake lock while splitting, resume after backgrounding | 3 |
+
 ## 5. Quality bar (all phases)
 - Audio: no clicks on any parameter change (ramps ≥8 ms); limiter on master; worklet never allocates per sample.
 - Touch: multiple controls at once; no accidental page scroll, zoom or text select; 44 px minimum targets.
