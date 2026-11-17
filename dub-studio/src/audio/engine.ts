@@ -242,7 +242,12 @@ function stopSources() {
 }
 export function stop() { pos0 = now(); stopSources(); playing = false; }
 export function seek(t: number) { const d = dur(); t = Math.max(0, Math.min(d, t)); if (playing) play(t); else pos0 = t; }
-export function relooped() { if (playing) play(now()); }   // loop points changed: line up again from here
+// loop switched: the scheduler follows on its own, unless what is already lined up (up to 1.5 s ahead) disagrees
+export function relooped() {
+  if (!playing || !ctx) return; const t = ctx.currentTime;
+  const wrapAhead = bps.some(b => b.ctx > t && Math.abs(b.song - loop.a) < 1e-6);   // a jump back to the loop start, no longer wanted
+  if ((loopOn() && schedSong > loop.b + 1e-6) || (!loopOn() && wrapAhead)) play(now());
+}
 export const ended = () => playing && !loopOn() && now() >= dur() - 0.02;
 export function rewind() { pos0 = 0; }
 export function songChanged() { cache.clear(); pend.clear(); }

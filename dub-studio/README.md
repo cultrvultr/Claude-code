@@ -30,6 +30,11 @@ Connect this GitHub repo in Cloudflare Pages with:
 - Mix snapshots A–D (hold to store, tap to recall). Guided tour. Works offline after the first visit.
 - FX page (echo and verb in detail), Synare XY pad, Siren page.
 
+**Feel**
+- Controls move by transform on their own GPU layers and are measured once per touch; the idle mixer does almost no layout.
+- Buttons act on touch-down (Mute and Loop too: holding on switches to Solo or a cue). Pressed states are instant.
+- Knobs show their value in a bubble and go fine when dragged slowly. Haptic ticks on steps, snaps and buttons (iPhone Safari 18+ via the native switch, Android via vibrate).
+
 **Track loader (Phase 2)**
 - Load 1 to 8 files; names like `drums`, `bass`, `vocals`, `guitar`, `keys`, `sax` go to their home channels.
 - Each part is cut into 10 s pieces of 16-bit PCM in the browser's private storage (OPFS); only the pieces near the playhead are in memory. Mono parts are stored mono.
@@ -48,7 +53,7 @@ Connect this GitHub repo in Cloudflare Pages with:
 
 ```bash
 npm run build && npm run preview   # then, in another shell:
-npm run test:e2e                   # smoke, channels, phase1, loader, library
+npm run test:e2e                   # smoke, channels, phase1, loader, library, feel
 npm run test:split                 # the splitter end to end (downloads the model; slow on CPU)
 ```
 

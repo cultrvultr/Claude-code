@@ -11,6 +11,7 @@ export function control(el: Element, o: Opts) {
     const e = ev as PointerEvent; e.preventDefault();
     try { (el as HTMLElement).setPointerCapture(e.pointerId); } catch { /* gone */ }
     const n = performance.now(), s: Gesture = { r: el.getBoundingClientRect(), x0: e.clientX, y0: e.clientY };
+    el.classList.add('pressed');   // instant visual feedback, no transition
     if (o.undoable !== false) gestureStart();
     if (o.dbl && n - lastDown < 300) { lastDown = 0; s.dbl = true; g.set(e.pointerId, s); o.dbl(s, e); return; }
     lastDown = n; g.set(e.pointerId, s);
@@ -20,7 +21,7 @@ export function control(el: Element, o: Opts) {
   el.addEventListener('pointermove', ev => { const e = ev as PointerEvent, s = g.get(e.pointerId); if (!s || s.dbl) return;
     if (s.t && Math.hypot(e.clientX - s.x0, e.clientY - s.y0) > 8) { clearTimeout(s.t); s.t = 0; }
     o.move?.(s, e); });
-  const end = (ev: Event) => { const e = ev as PointerEvent, s = g.get(e.pointerId); if (!s) return; g.delete(e.pointerId); clearTimeout(s.t);
+  const end = (ev: Event) => { const e = ev as PointerEvent, s = g.get(e.pointerId); if (!s) return; g.delete(e.pointerId); clearTimeout(s.t); if (!g.size) el.classList.remove('pressed');
     if (!s.dbl) o.up?.(s, e); if (o.undoable !== false) gestureEnd(); };
   el.addEventListener('pointerup', end); el.addEventListener('pointercancel', end);
   for (const t of ['touchstart', 'touchmove']) el.addEventListener(t, e => e.preventDefault(), { passive: false });

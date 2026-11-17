@@ -11,8 +11,10 @@ import * as Store from './loader/store';
 import * as Split from './split/split';
 import { control, guardPage, clamp, xFrac } from './ui/control';
 import { knob, fader, bar, seg } from './ui/widgets';
+import { tick } from './ui/haptic';
 
 const $ = <T extends HTMLElement = HTMLElement>(id: string) => document.getElementById(id) as T;
+const setText = (id: string, t: string) => { const e = $(id); if (e.textContent !== t) e.textContent = t; };   // writing equal text still costs a layout
 const draws: (() => void)[] = [];
 const redraw = () => draws.forEach(f => f());
 guardPage();
@@ -37,8 +39,8 @@ document.querySelectorAll<HTMLElement>('.st').forEach(st => {
   const c = +st.dataset.c!, q = S.ch[c];
   const [kc, ke, kv] = [...st.querySelectorAll<SVGSVGElement>('.kn')];
   draws.push(knob(kc, { get: () => (q.cut + 10) / 20, set: v => { q.cut = Math.round(v * 20) - 10; A.applyChan(c, 'cut'); }, home: 0.5, bi: true, steps: 20, label: v => cutLab(Math.round(v * 20) - 10), sens: 160 }));
-  draws.push(knob(ke, { get: () => q.echo, set: v => { q.echo = v; A.applyChan(c, 'echo'); }, home: 0 }));
-  draws.push(knob(kv, { get: () => q.verb, set: v => { q.verb = v; A.applyChan(c, 'verb'); }, home: 0 }));
+  draws.push(knob(ke, { get: () => q.echo, set: v => { q.echo = v; A.applyChan(c, 'echo'); }, home: 0, name: 'Echo' }));
+  draws.push(knob(kv, { get: () => q.verb, set: v => { q.verb = v; A.applyChan(c, 'verb'); }, home: 0, name: 'Verb' }));
   const fd = st.querySelector<HTMLElement>('.fd')!;
   const df = fader(fd, () => q.fader, v => { q.fader = v; A.applyChan(c, 'fader'); }); draws.push(df); faderDraws.push(df); addEventListener('resize', df);
   meterEls.push(st.querySelector<HTMLElement>('.mt i')!);
@@ -48,8 +50,10 @@ document.querySelectorAll<HTMLElement>('.st').forEach(st => {
   const mu = st.querySelector<HTMLElement>('.mute')!;
   const dm = () => { mu.classList.toggle('on', q.mute && !q.solo); mu.classList.toggle('solo', q.solo); mu.textContent = q.solo ? 'Solo' : 'Mute'; };
   draws.push(dm); muteDraws.push(dm);
-  control(mu, { long: () => { q.solo = !q.solo; A.applySolo(); muteDraws.forEach(f => f()); }, longMs: 400,
-    up: s => { if (s.long) return; if (q.solo) { q.solo = false; A.applySolo(); } else { q.mute = !q.mute; A.applyChan(c, 'mute'); } muteDraws.forEach(f => f()); } });
+  // acts the moment the finger lands; held on, it undoes that and toggles solo instead
+  control(mu, { longMs: 400,
+    down: s => { tick(); s.skip = q.solo; if (q.solo) { q.solo = false; A.applySolo(); } else { q.mute = !q.mute; A.applyChan(c, 'mute'); } muteDraws.forEach(f => f()); },
+    long: s => { if (s.skip) return; q.mute = !q.mute; A.applyChan(c, 'mute'); q.solo = true; A.applySolo(); tick(); muteDraws.forEach(f => f()); } });   // a soloed part: the touch already un-soloed it
   const slot = st.querySelector<HTMLElement>('.slot')!;
   draws.push(() => { const s = A.song.stems[c]; slot.textContent = s.status ? '…' : s.name; slot.classList.toggle('empty', !s.meta); st.hidden = c >= A.song.count; });
   control(slot, { undoable: false, up: () => pickOne(c) });
@@ -73,24 +77,24 @@ const pSir = $('pSir'), pSyn = $('pSyn');
 const onKnob = (e: PointerEvent) => !!(e.target as Element).closest?.('.lvk');
 function sirenUI() { const on = A.sirenOn(); pSir.classList.toggle('on', on); $('sTrig').classList.toggle('on', on); }
 control(pSir, { undoable: false,
-  down: async (s, e) => { if (onKnob(e)) { s.skip = true; return; } await A.ensure(); A.siren(S.m.sir.momentary ? true : !A.sirenOn()); sirenUI(); },
+  down: async (s, e) => { if (onKnob(e)) { s.skip = true; return; } tick(); await A.ensure(); A.siren(S.m.sir.momentary ? true : !A.sirenOn()); sirenUI(); },
   up: s => { if (!s.skip && S.m.sir.momentary) { A.siren(false); sirenUI(); } } });
 control(pSyn, { undoable: false, down: async (s, e) => {
   if (onKnob(e)) return; await A.ensure();
-  const u = clamp(1 - (e.clientY - s.r.top) / s.r.height, 0, 1); A.hit(strike(0.55 + 0.45 * u));
+  const u = clamp(1 - (e.clientY - s.r.top) / s.r.height, 0, 1); A.hit(strike(0.55 + 0.45 * u)); tick();
   pSyn.classList.add('on'); setTimeout(() => pSyn.classList.remove('on'), 160); } });
 document.querySelectorAll<SVGSVGElement>('.lvk').forEach(k => {
   k.addEventListener('pointerdown', e => e.stopPropagation());
   const sir = k.dataset.l === 'sir';
-  draws.push(knob(k, { get: () => sir ? S.m.sir.vol : S.m.syn.level, set: v => { if (sir) S.m.sir.vol = v; else S.m.syn.level = v; A.applyEcho(); }, home: sir ? 0.7 : 0.5, sens: 160 }));
+  draws.push(knob(k, { get: () => sir ? S.m.sir.vol : S.m.syn.level, set: v => { if (sir) S.m.sir.vol = v; else S.m.syn.level = v; A.applyEcho(); }, home: sir ? 0.7 : 0.5, sens: 160, name: sir ? 'Siren' : 'Synare' }));
 });
 
 // ---------- the echo card ----------
 const echoChange = () => { A.applyEcho(); drawEcho(); drawFx(); };
 function drawEcho() {
-  $('rDly').textContent = S.m.sync ? DIVS[S.m.div][0] : Math.round(A.dlyMs()) + 'ms';
-  $('rRep').textContent = S.m.rep.toFixed(1); $('rRet').textContent = String(Math.round(S.m.ret * 100));
-  $('bRep').classList.toggle('hot', S.m.rep > 9); $('bpm').textContent = A.song.bpm.toFixed(0);
+  setText('rDly', S.m.sync ? DIVS[S.m.div][0] : Math.round(A.dlyMs()) + 'ms');
+  setText('rRep', S.m.rep.toFixed(1)); setText('rRet', String(Math.round(S.m.ret * 100)));
+  $('bRep').classList.toggle('hot', S.m.rep > 9); setText('bpm', A.song.bpm.toFixed(0));
   dDly(); dRep(); dRet();
 }
 const dDly = bar($('bDly'), { get: () => S.m.sync ? S.m.div / 8 : S.m.dly, set: v => { if (S.m.sync) S.m.div = Math.round(v * 8); else S.m.dly = v; echoChange(); } });
@@ -101,7 +105,7 @@ draws.push(drawEcho);
 // tap tempo: the average of the last taps, reset after 2 s
 let taps: number[] = [];
 control($('tapBtn'), { undoable: false, down: () => {
-  const n = performance.now(); if (taps.length && n - taps[taps.length - 1] > 2000) taps = []; taps.push(n); taps = taps.slice(-6);
+  tick(); const n = performance.now(); if (taps.length && n - taps[taps.length - 1] > 2000) taps = []; taps.push(n); taps = taps.slice(-6);
   if (taps.length >= 3) { const d = (taps[taps.length - 1] - taps[0]) / (taps.length - 1); A.song.bpm = Math.round(60000 / d * 10) / 10; echoChange(); saveSong(); }
   $('tapBtn').classList.add('on'); setTimeout(() => $('tapBtn').classList.remove('on'), 90); } });
 
@@ -129,6 +133,7 @@ const dE2V = bar($('bE2V'), { get: () => S.m.e2v, set: v => { S.m.e2v = v; echoC
 const dRet2 = bar($('bRet2'), { get: () => S.m.ret / 1.5, set: v => { S.m.ret = v * 1.5; echoChange(); }, snap: 1 / 1.5 });
 const dMix = bar($('bMix'), { get: () => S.m.mix / 10, set: v => { S.m.mix = v * 10; echoChange(); }, snap: 0.5 });
 function drawFx() {
+  if ($('fx').hidden) return;
   dSync(); dDiv(); dWid(); dBass(); dTreb(); dE2V(); dRet2(); dMix();
   $('xDiv').classList.toggle('dim', !S.m.sync);
   $('xTempo').textContent = A.song.bpm.toFixed(1).replace(/\.0$/, '') + ' BPM';
@@ -150,6 +155,7 @@ const dHC = bar($('bHC'), { steps: 10, get: () => S.m.vHc / 10, set: v => { S.m.
 const dVRet = bar($('bVRet'), { get: () => S.m.vRet / 1.5, set: v => { S.m.vRet = v * 1.5; A.applyVerb(); drawVerb(); }, snap: 1 / 1.5 });
 const hzLab = (f: number) => f ? (f >= 1000 ? f / 1000 + 'K' : String(f)) : 'Off';
 function drawVerb() {
+  if ($('fx').hidden) return;
   dSel(); dDec(); dLC(); dHC(); dVRet();
   const ir = A.irOf(S.m.vIr), d = S.m.vDec || (ir ? ir.len : 0), g = $('vGraph') as unknown as SVGSVGElement;
   $('rDec').textContent = ir ? d.toFixed(1) + ' s' + (S.m.vDec ? '' : ' (full)') : 'Press play to load';
@@ -164,7 +170,7 @@ draws.push(drawVerb);
 const xy = $('xy'), xyDot = $('xyDot');
 function drawSyn() {
   $('rHz').textContent = Math.round(A.xToHz(S.m.syn.x)) + ' Hz'; $('rSDec').textContent = S.m.syn.dec.toFixed(2) + ' s';
-  xyDot.style.left = (S.m.syn.x * 100) + '%'; xyDot.style.top = (100 - Math.sqrt((S.m.syn.dec - 0.02) / 1.98) * 100) + '%';
+  xyDot.style.transform = `translate3d(${(S.m.syn.x * xy.clientWidth).toFixed(1)}px, ${((1 - Math.sqrt((S.m.syn.dec - 0.02) / 1.98)) * xy.clientHeight).toFixed(1)}px, 0)`;
 }
 { const pts = new Map<number, { x: number; y: number }>(); let first = -1, d0 = 0;
   xy.addEventListener('pointerdown', async e => {
@@ -208,20 +214,21 @@ async function playToggle() {
   if (A.playing) { A.stop(); letSleep(); silentAudio.pause(); } else { A.play(); keepAwake(); silentAudio.play().catch(() => {}); latencyCheck(); }
   icon(); media();
 }
-control($('play'), { undoable: false, down: playToggle });
+control($('play'), { undoable: false, down: () => { tick(); playToggle(); } });
 control($('prog'), { undoable: false, down: (s, e) => { scrub = xFrac(s, e) * A.dur(); }, move: (s, e) => { scrub = xFrac(s, e) * A.dur(); },
   up: () => { if (scrub !== null) { const d = A.dur(), near = A.song.cues.find(c => Math.abs(c - scrub!) < d * 0.04); A.seek(near ?? scrub); } scrub = null; } });
 addEventListener('keydown', e => { if (e.code !== 'Space' || !$('start').hidden || (e.target as Element).closest?.('input, select, textarea, button')) return; e.preventDefault(); if (!e.repeat) playToggle(); });
 
 // loop: 4 bars from the bar you are in
 function drawLoop() { const b = $('band'), d = A.dur() || 1; b.hidden = !A.loop.on; b.style.left = A.loop.a / d * 100 + '%'; b.style.width = (A.loop.b - A.loop.a) / d * 100 + '%'; $('loopBtn').classList.toggle('on', A.loop.on); $('loopBtn').setAttribute('aria-pressed', String(A.loop.on)); }
-control($('loopBtn'), { undoable: false, longMs: 450,
-  long: () => { if (!A.dur()) return; const t = Math.round(A.now() * 100) / 100; A.song.cues = [...A.song.cues.filter(c => Math.abs(c - t) > 0.5), t].sort((a, b) => a - b).slice(-12); drawCues(); saveSong(); toast(`Cue at ${fmt(t)}. Tap near it on the line to jump there.`); },
-  up: s => { if (s.long) return;
-  if (!A.dur()) return;
+function toggleLoop() {
   if (A.loop.on) A.loop.on = false;
   else { const barS = 240 / A.song.bpm, t = A.now(); A.loop.a = Math.floor(t / barS) * barS; A.loop.b = Math.min(A.dur(), A.loop.a + 4 * barS); A.loop.on = true; }
-  A.relooped(); drawLoop(); } });
+  A.relooped(); drawLoop();
+}
+control($('loopBtn'), { undoable: false, longMs: 450,
+  down: () => { if (!A.dur()) return; tick(); toggleLoop(); },
+  long: () => { if (!A.dur()) return; toggleLoop(); tick(); const t = Math.round(A.now() * 100) / 100; A.song.cues = [...A.song.cues.filter(c => Math.abs(c - t) > 0.5), t].sort((a, b) => a - b).slice(-12); drawCues(); saveSong(); toast(`Cue at ${fmt(t)}. Tap near it on the line to jump there.`); } });
 
 // undo and reset
 const drawUndo = () => { ($('undoBtn') as HTMLButtonElement).disabled = !canUndo(); };
@@ -264,15 +271,26 @@ $('tourBtn').addEventListener('click', () => { closeSheets(); tour.open(MIXER_TO
 function firstTour() { try { if (localStorage.getItem('dub-studio-toured')) return; localStorage.setItem('dub-studio-toured', '1'); } catch { return; } setTimeout(() => tour.open(MIXER_TOUR), 900); }
 
 // ---------- the frame loop: time, position, meters ----------
-let peakHold = 0;
+// Writes only what changed, and only transforms (no layout): the clock when its text changes, the playhead every
+// frame, meters 30 times a second with a little smoothing.
+let peakHold = 0, lastTime = '', lastPos = -1, odd = false, brandClip = false, progW = 0;
+const meterShown = new Float32Array(8), meterClip = new Uint8Array(8), brand = document.querySelector('.brand')!, posBar = $('pos'), posDot = $('posDot');
+const measureProg = () => { progW = $('prog').clientWidth; lastPos = -1; };
+addEventListener('resize', measureProg); requestAnimationFrame(measureProg);
 function frame() {
   requestAnimationFrame(frame);
   if (A.ended()) { A.stop(); A.rewind(); icon(); letSleep(); media(); }
   const d = A.dur(), t = scrub ?? A.now();
-  $('time').textContent = fmt(t) + ' / ' + fmt(d); $('pos').style.width = (d ? t / d * 100 : 0) + '%';
-  const m = A.meters();
-  if (m) { m.ch.forEach((p, i) => { const db = 20 * Math.log10(p + 1e-6), h = clamp((db + 48) / 48, 0, 1); meterEls[i].style.height = h * 100 + '%'; meterEls[i].classList.toggle('clip', p > 0.98); });
-    peakHold = Math.max(m.master, peakHold * 0.95); document.querySelector('.brand')!.classList.toggle('clip', peakHold > 0.99); }
+  const tt = fmt(t) + ' / ' + fmt(d); if (tt !== lastTime) { lastTime = tt; $('time').textContent = tt; }
+  const f = d ? t / d : 0; if (Math.abs(f - lastPos) * progW > 0.3) { lastPos = f; posBar.style.transform = `scaleX(${f.toFixed(5)})`; posDot.style.transform = `translate3d(${(f * progW).toFixed(1)}px, 0, 0)`; }
+  if ((odd = !odd)) return;   // meters at 30 fps
+  const m = A.meters(); if (!m) return;
+  m.ch.forEach((p, i) => {
+    const db = 20 * Math.log10(p + 1e-6), h = clamp((db + 48) / 48, 0, 1), v = h > meterShown[i] ? h : meterShown[i] * 0.86 + h * 0.14;   // fast up, smooth fall
+    if (Math.abs(v - meterShown[i]) > 0.004) { meterShown[i] = v; meterEls[i].style.transform = `scaleY(${v.toFixed(3)})`; }
+    const c = p > 0.98 ? 1 : 0; if (c !== meterClip[i]) { meterClip[i] = c; meterEls[i].classList.toggle('clip', !!c); }
+  });
+  peakHold = Math.max(m.master, peakHold * 0.95); const bc = peakHold > 0.99; if (bc !== brandClip) { brandClip = bc; brand.classList.toggle('clip', bc); }
 }
 requestAnimationFrame(frame);
 
@@ -435,10 +453,10 @@ async function runSplit(f: File) {
   const id = A.song.id;
   try {
     const r = await Split.splitFile(f, id, p => {
-      if (p.stage === 'decode') { fill.style.width = '2%'; st.textContent = 'Reading the song…'; }
-      if (p.stage === 'model') { fill.style.width = (p.done / p.total * 100).toFixed(1) + '%'; st.textContent = `Downloading the model: ${Math.round(p.done / 1e6)} of ${Math.round(p.total / 1e6)} MB`; }
-      if (p.stage === 'load') { fill.style.width = '100%'; st.textContent = 'Starting the splitter…'; }
-      if (p.stage === 'split') { fill.style.width = (p.done / p.total * 100).toFixed(1) + '%'; st.textContent = `Splitting: ${Math.round(p.done / p.total * 100)}%` + (p.eta !== undefined ? ` · about ${mmss(p.eta)} left` : '') + (p.ep === 'wasm' ? ' (no GPU: slower)' : ''); }
+      if (p.stage === 'decode') { fill.style.transform = 'scaleX(.02)'; st.textContent = 'Reading the song…'; }
+      if (p.stage === 'model') { fill.style.transform = `scaleX(${(p.done / p.total).toFixed(4)})`; st.textContent = `Downloading the model: ${Math.round(p.done / 1e6)} of ${Math.round(p.total / 1e6)} MB`; }
+      if (p.stage === 'load') { fill.style.transform = 'scaleX(1)'; st.textContent = 'Starting the splitter…'; }
+      if (p.stage === 'split') { fill.style.transform = `scaleX(${(p.done / p.total).toFixed(4)})`; st.textContent = `Splitting: ${Math.round(p.done / p.total * 100)}%` + (p.eta !== undefined ? ` · about ${mmss(p.eta)} left` : '') + (p.ep === 'wasm' ? ' (no GPU: slower)' : ''); }
     });
     if (A.song.id !== id) return;
     A.song.sr = 44100; A.song.title = base(f); source = 'split';
