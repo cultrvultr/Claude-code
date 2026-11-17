@@ -22,6 +22,9 @@ function wav(s) { const sr = 22050, n = sr * s, b = Buffer.alloc(44 + n * 2); b.
   const k0 = await kv(); await swipe('.st:not(.off):not([hidden]) .kn[data-p="echo"]', 200);
   if ((await vis()) !== 'Drums,Bass,Other,Vocals') fail('swipe right did not show 1-4: ' + await vis());
   if ((await cap()) !== c0) fail('the swipe moved the fader it started on');
+  // a moderate, unhurried sideways drag does not switch either: it takes a firm stroke
+  await swipe('.st:not(.off):not([hidden]) >> nth=3 >> .slot', -100, 700);
+  if ((await vis()) !== 'Drums,Bass,Other,Vocals') fail('a moderate drag switched banks');
   // a short slow drag sideways does not switch
   await swipe('.st:not(.off):not([hidden]) >> nth=2 >> .slot', -40, 800);
   if ((await vis()) !== 'Drums,Bass,Other,Vocals') fail('a short drag switched banks');

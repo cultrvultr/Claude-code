@@ -92,13 +92,14 @@ $('banks').querySelectorAll<HTMLElement>('i').forEach((b, i) => control(b, { und
   strips.addEventListener('pointerdown', e => { if (id >= 0 || !canSwipe()) return; id = e.pointerId; x0 = e.clientX; y0 = e.clientY; t0 = e.timeStamp; on = false; dx = 0; });
   strips.addEventListener('pointermove', e => {
     if (e.pointerId !== id) return; dx = e.clientX - x0; const dy = e.clientY - y0;
-    if (!on) { if (Math.abs(dx) > 14 && Math.abs(dx) > 1.6 * Math.abs(dy)) { on = true; abandonWithin(strips); try { strips.setPointerCapture(id); } catch { /* */ } strips.classList.remove('in-l', 'in-r'); } else return; }
+    // a deliberate sideways stroke, not a wobble
+    if (!on) { if (Math.abs(dx) > 34 && Math.abs(dx) > 2.4 * Math.abs(dy)) { on = true; abandonWithin(strips); try { strips.setPointerCapture(id); } catch { /* */ } strips.classList.remove('in-l', 'in-r'); } else return; }
     const edge = (bank === 0 && dx > 0) || (bank === 1 && dx < 0);   // nothing that way: resist
     strips.style.transform = `translate3d(${(edge ? dx * 0.25 : dx).toFixed(1)}px, 0, 0)`;
   });
   const end = (e: PointerEvent) => {
     if (e.pointerId !== id) return; id = -1; if (!on) return; on = false;
-    const v = dx / Math.max(1, e.timeStamp - t0), far = Math.abs(dx) > strips.clientWidth * 0.18 || Math.abs(v) > 0.45;
+    const v = dx / Math.max(1, e.timeStamp - t0), far = Math.abs(dx) > strips.clientWidth * 0.35 || (Math.abs(dx) > strips.clientWidth * 0.2 && Math.abs(v) > 0.9);   // a third of the way, or a fast flick
     strips.style.transform = '';
     if (far && dx < 0 && bank === 0) setBank(1); else if (far && dx > 0 && bank === 1) setBank(0);
     else { strips.classList.add('back'); setTimeout(() => strips.classList.remove('back'), 200); }
