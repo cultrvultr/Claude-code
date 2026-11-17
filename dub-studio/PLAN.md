@@ -175,8 +175,15 @@ Goal: drop in one full mix, get 4 stems in the 4 slots.
 - Perf budget: app shell <150 KB gzipped (excluding model and IRs).
 - Test matrix: iOS Safari (latest −1), Android Chrome, desktop Chrome/Firefox/Safari.
 
-## 6. Open questions
-1. Hosting: static host is fine for Phases 1–2, 4. Phase 3's WASM threads need COOP/COEP headers. Which host?
-2. Reverb IRs: record/licence our own, or use CC0 IRs?
-3. Branding: name, colours, font for our version?
-4. Splitter on phones: in-browser only, or also a server option for slow devices?
+## 6. Decisions
+1. **Hosting: Cloudflare Pages**, deployed from this GitHub repo on every push. Free, HTTPS, global CDN, and a `_headers` file sets COOP/COEP. Fallback: GitHub Pages with the `coi-serviceworker` shim to add those headers.
+2. **Reverb IRs: CC0** for now (e.g. OpenAIR CC0 sets, Voxengo free IRs where the licence allows). Licence recorded per IR in `assets/irs/LICENSES.md`.
+3. **Look: 70s roots / rasta.** Muted, worn, printed. Evoke the era; copy no label's logos or artwork.
+   - Palette: faded red, ochre gold, olive green on warm black and aged cream paper.
+   - Texture: paper grain, halftone, screen-print misregistration, worn edges, record-label rings.
+   - Type: chunky 70s display face for titles (OFL licence), typewriter / mono for labels and readouts.
+   - Controls: bakelite knobs, worn fader caps, rubber-stamp buttons.
+4. **Target: recent iPhone (iOS 26 Safari) on Wi-Fi.**
+   - Splitter runs in the browser on **WebGPU** (Safari 26 has it). No server.
+   - Network tiers and rescue logic drop out of Phase 1–2 scope (Wi-Fi, local files).
+   - Design for iOS limits: tab memory, storage eviction, audio stops on lock.
