@@ -9,7 +9,7 @@
     "preview": "vite preview --host",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
-    "test:e2e": "node tests/smoke.cjs && node tests/channels.cjs && node tests/phase1.cjs && node tests/loader.cjs && node tests/library.cjs && node tests/feel.cjs && node tests/names.cjs && node tests/swipe.cjs",
+    "test:e2e": "node tests/smoke.cjs && node tests/channels.cjs && node tests/phase1.cjs && node tests/loader.cjs && node tests/library.cjs && node tests/feel.cjs && node tests/names.cjs && node tests/swipe.cjs && node tests/pan.cjs",
     "test:split": "node tests/split.cjs"
   },
   "devDependencies": {

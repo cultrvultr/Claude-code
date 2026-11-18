@@ -270,7 +270,7 @@ control($('loopBtn'), { undoable: false, longMs: 450,
 // undo and reset
 const drawUndo = () => { ($('undoBtn') as HTMLButtonElement).disabled = !canUndo(); };
 watchUndo(() => { drawUndo(); saveSong(); }); drawUndo();
-const applyAll = () => { A.applySolo(); for (let c = 0; c < A.N; c++) for (const p of ['cut', 'fader', 'mute', 'echo', 'verb'] as const) A.applyChan(c, p); A.applyEcho(); A.applyVerb(); A.setVerbIR(); redraw(); };
+const applyAll = () => { A.applySolo(); for (let c = 0; c < A.N; c++) for (const p of ['cut', 'fader', 'mute', 'echo', 'verb', 'pan'] as const) A.applyChan(c, p); A.applyEcho(); A.applyVerb(); A.setVerbIR(); redraw(); };
 control($('undoBtn'), { undoable: false, down: () => { if (popUndo()) applyAll(); } });
 control($('resetBtn'), { undoable: false, long: () => { resetMix(); applyAll(); toast('Mix reset'); }, longMs: 500, up: s => { if (!s.long) toast('Hold Reset to clear the channels'); } });
 
@@ -359,9 +359,17 @@ let metaT = 0;
 function songMeta(): Store.SongMeta {
   return { id: A.song.id, title: A.song.title, bpm: A.song.bpm, bpmAuto: A.song.bpmAuto, sr: A.song.sr, seg: Store.SEG, gain: A.song.gain, cues: A.song.cues,
     stems: A.song.stems.slice(0, A.song.count).map(st => st.meta ? { ...st.meta, name: st.name } : null), created: created, played: Date.now(),
-    mix: mixJson(), snaps: getSnaps(), source };
+    mix: mixJson(), snaps: getSnaps(), source, spread };
 }
-let created = Date.now(), source: Store.SongMeta['source'] = 'files', persistAsked = false;
+let created = Date.now(), source: Store.SongMeta['source'] = 'files', persistAsked = false, spread = true;
+// stereo spread: each part gets a place from its name (the low end and the voice stay in the middle)
+const PLACES: [RegExp, number][] = [[/drum|kick|snare|kit|beat/i, 0], [/bass|sub/i, 0], [/vox|vocal|voice|sing|lead vo/i, 0],
+  [/guit|gtr|chop|skank/i, -0.35], [/key|organ|piano|synth|pad|clav|rhodes/i, 0.35], [/perc|shak|tamb|conga|bongo|hand|nyab|bell/i, 0.5],
+  [/horn|brass|sax|trump|tromb|flute|melod|harmonica/i, -0.25], [/fx|effect|noise/i, 0.2], [/other|inst|music|backing/i, -0.1]];
+const placeOf = (name: string, c: number) => PLACES.find(([r]) => r.test(name))?.[1] ?? (c % 2 ? 0.25 : -0.25);
+const loadedNow = new Set<number>();   // parts loaded in this go: they get their place when the load finishes
+function setPan(c: number, v: number) { S.ch[c].pan = Math.round(clamp(v, -1, 1) * 100) / 100; A.applyChan(c, 'pan'); }
+function applySpread(all: boolean) { for (let c = 0; c < A.song.count; c++) if (all || loadedNow.has(c)) setPan(c, spread ? placeOf(A.song.stems[c].name, c) : 0); loadedNow.clear(); save(); }
 function saveSong(now = false) { if (!A.song.id) return; if (now) { clearTimeout(metaT); Store.saveMeta(songMeta()); try { localStorage.setItem('dub-studio-last', A.song.id); } catch { /* */ } return; } if (!persistAsked) { persistAsked = true; navigator.storage?.persist?.().catch(() => {}); } clearTimeout(metaT); metaT = window.setTimeout(() => { Store.saveMeta(songMeta()); try { localStorage.setItem('dub-studio-last', A.song.id); } catch { /* */ } }, 300); }
 
 // file names to slots: each role has its home channel (see DEFAULT_NAMES)
@@ -392,7 +400,7 @@ async function stemFrom(c: number, name: string, channels: () => Promise<Float32
   status(c, 'Saving…');
   const r = await Store.pieceStem(id, c, A.song.sr, data); same();
   A.song.stems[c].meta = { name, n: r.n, ch: r.ch, dur: r.dur, peaks: r.peaks, ms: r.ms, offset: 0, file };
-  A.song.stems[c].name = name; onsetsBy.set(c, { on: r.onsets, hop: r.hop });
+  A.song.stems[c].name = name; onsetsBy.set(c, { on: r.onsets, hop: r.hop }); loadedNow.add(c);
   status(c, undefined);
 }
 const fromFile = (f: File) => async () => { const b = await A.decodeFile(f); const out: Float32Array[] = []; for (let k = 0; k < Math.min(2, b.numberOfChannels); k++) out.push(new Float32Array(b.getChannelData(k))); return out; };
@@ -400,13 +408,14 @@ function finishSong() {
   // tempo: from the drums if there are any, else the first part
   if (A.song.bpmAuto) { const src = onsetsBy.get(0) || onsetsBy.values().next().value; const bpm = src ? Store.detectBpm(src.on, A.song.sr, src.hop) : null; if (bpm) { A.song.bpm = bpm; echoChange(); } }
   A.setSongGain(Store.songGain(A.song.stems.slice(0, A.song.count).map(s => s.meta?.ms || 0)));
+  applySpread(false);
   onsetsBy.clear(); saveSong(true); redraw(); slotsDraw(); drawLoop(); drawCues(); media();
 }
 function newSong(count: number, title: string, id = Store.newSongId()) {
   if (A.playing) { A.stop(); icon(); letSleep(); }
   A.loop.on = false; A.songChanged(); A.seek(0);
   Object.assign(A.song, { id, title, count, bpmAuto: true, cues: [], gain: 1, sr: A.ctx ? A.ctx.sampleRate : 48000 }); created = Date.now(); source = 'files';
-  setSnaps([]); recBlob = null;
+  setSnaps([]); recBlob = null; spread = true; loadedNow.clear();
   A.song.stems.forEach((s, i) => { s.meta = null; s.status = undefined; s.name = A.DEFAULT_NAMES[i]; });
   S.ch.forEach(c => Object.assign(c, freshChan())); applyAll();   // a new song starts on a clean desk; echo and verb settings stay
 }
@@ -438,7 +447,7 @@ function commonName(fs: File[]) { const n = fs.map(base); let p = n[0] || ''; fo
 async function openSong(m: Store.SongMeta) {
   await A.ensure();
   newSong(Math.max(4, m.stems.length), m.title, m.id);
-  Object.assign(A.song, { bpm: m.bpm, bpmAuto: m.bpmAuto ?? false, sr: m.sr, cues: m.cues || [] }); created = m.created; source = m.source || 'files';
+  Object.assign(A.song, { bpm: m.bpm, bpmAuto: m.bpmAuto ?? false, sr: m.sr, cues: m.cues || [] }); created = m.created; source = m.source || 'files'; spread = m.spread ?? true; loadedNow.clear();
   setMix(m.mix); setSnaps(m.snaps); applyAll();
   m.stems.forEach((st, i) => { if (st) { A.song.stems[i].meta = st; A.song.stems[i].name = st.name; } });
   A.setSongGain(m.gain); echoChange(); saveSong(); redraw(); slotsDraw(); drawLoop(); drawCues(); media();
@@ -470,18 +479,28 @@ control($('loadDemo'), { undoable: false, up: () => { closeSheets(); loadDemo();
 
 const wave = (peaks: number[], h = 22) => { const W = peaks.length; return `<svg class="wave" viewBox="0 0 ${W} ${h}" preserveAspectRatio="none"><path d="${peaks.map((p, x) => `M${x} ${(h / 2 - p * h / 2).toFixed(1)}V${(h / 2 + p * h / 2).toFixed(1)}`).join('')}"/></svg>`; };
 const esc = (t: string) => t.replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]!));
+const panLab = (v: number) => Math.abs(v) < 0.005 ? 'C' : (v < 0 ? 'L' : 'R') + Math.round(Math.abs(v) * 100);
 function slotsDraw() {
   ($('fTitle') as HTMLInputElement).value = A.song.title; ($('fBpm') as HTMLInputElement).value = String(A.song.bpm);
   $('bpmNote').textContent = A.song.bpmAuto && A.song.id ? 'Found from the drums. Tap Tap on the mixer, or type, to change it.' : '';
   $('slots').innerHTML = A.song.stems.slice(0, A.song.count).map((s, i) => `<div class="slotrow">
       <input data-i="${i}" value="${esc(s.name)}" maxlength="24" aria-label="Track ${i + 1} name">
       <span>${s.status || (s.meta ? fmt(s.meta.dur) + (s.meta.ch === 1 ? ' mono' : '') : 'empty')}</span><button data-load="${i}">Load</button>
-      ${s.meta ? `<div class="wv">${wave(s.meta.peaks)}<label>Nudge <input type="number" data-off="${i}" value="${s.meta.offset}" step="5" min="-2000" max="2000" inputmode="numeric"> ms</label><button class="share" data-wav="${i}">WAV</button></div>` : ''}</div>`).join('')
+      ${s.meta ? `<div class="wv">${wave(s.meta.peaks)}<label>Nudge <input type="number" data-off="${i}" value="${s.meta.offset}" step="5" min="-2000" max="2000" inputmode="numeric"> ms</label><button class="share" data-wav="${i}">WAV</button></div>
+      <div class="pn"><span>Pan</span><input type="range" data-pan="${i}" min="-100" max="100" step="1" value="${Math.round((S.ch[i].pan || 0) * 100)}" aria-label="Track ${i + 1} pan"><b data-panv="${i}">${panLab(S.ch[i].pan || 0)}</b></div>` : ''}</div>`).join('')
     + `<div class="slotadd">${A.song.count < A.N ? '<button id="addTrack">+ Add track</button>' : ''}${A.song.count > 4 ? '<button id="delTrack">− Remove last</button>' : ''}${A.song.cues.length ? '<button id="clearCues">Clear cues</button>' : ''}</div>`;
   $('slots').querySelectorAll<HTMLInputElement>('input[data-i]').forEach(inp => inp.addEventListener('input', () => { A.song.stems[+inp.dataset.i!].name = inp.value || '—'; redraw(); saveSong(); }));
   $('slots').querySelectorAll<HTMLInputElement>('input[data-off]').forEach(inp => inp.addEventListener('change', () => { const m = A.song.stems[+inp.dataset.off!].meta; if (!m) return;
     m.offset = clamp(Math.round(+inp.value || 0), -2000, 2000); inp.value = String(m.offset); A.songChanged(); if (A.playing) A.play(A.now()); saveSong(); }));
   $('slots').querySelectorAll<HTMLElement>('[data-load]').forEach(b => b.addEventListener('click', () => pickOne(+b.dataset.load!)));
+  $('slots').querySelectorAll<HTMLInputElement>('input[data-pan]').forEach(inp => {
+    const i = +inp.dataset.pan!, lab = $('slots').querySelector<HTMLElement>(`[data-panv="${i}"]`)!;
+    inp.addEventListener('pointerdown', () => gestureStart());
+    inp.addEventListener('input', () => { let v = +inp.value / 100; if (Math.abs(v) < 0.05) { v = 0; inp.value = '0'; } setPan(i, v); lab.textContent = panLab(v); });
+    inp.addEventListener('change', () => { gestureEnd(); save(); });
+    inp.addEventListener('dblclick', () => { setPan(i, 0); inp.value = '0'; lab.textContent = panLab(0); save(); });
+  });
+  ($('fSpread') as HTMLInputElement).checked = spread;
   $('slots').querySelectorAll<HTMLElement>('[data-wav]').forEach(b => b.addEventListener('click', async () => { const i = +b.dataset.wav!;
     try { await shareBlob(await Store.stemWav(songMeta(), i), `${fileSafe(A.song.title)}-${fileSafe(A.song.stems[i].name)}.wav`); } catch (e) { toast('Could not export: ' + (e as Error).message); } }));
   document.getElementById('addTrack')?.addEventListener('click', () => { A.song.count++; bank = Math.floor((A.song.count - 1) / 4); slotsDraw(); redraw(); saveSong(); });
@@ -489,6 +508,7 @@ function slotsDraw() {
     S.ch[i].solo = false; A.applySolo(); if (A.playing) A.play(A.now()); slotsDraw(); redraw(); saveSong(); });
   document.getElementById('clearCues')?.addEventListener('click', () => { A.song.cues = []; drawCues(); slotsDraw(); saveSong(); });
 }
+$('fSpread').addEventListener('change', e => { gestureStart(); spread = (e.target as HTMLInputElement).checked; applySpread(true); gestureEnd(); saveSong(); slotsDraw(); });
 $('fTitle').addEventListener('input', e => { A.song.title = (e.target as HTMLInputElement).value; $('songBtn').textContent = A.song.title || 'Untitled'; saveSong(); media(); });
 $('fBpm').addEventListener('change', e => { const v = +(e.target as HTMLInputElement).value; if (v >= 40 && v <= 220) { A.song.bpm = v; A.song.bpmAuto = false; echoChange(); saveSong(); slotsDraw(); } });
 draws.push(() => { $('songBtn').textContent = A.song.title || 'Load tracks'; });
@@ -583,9 +603,21 @@ document.querySelectorAll<HTMLElement>('.sheetbg').forEach(s => s.addEventListen
 control($('helpBtn'), { undoable: false, up: () => openSheet('helpSheet') });
 
 // ---------- start screen ----------
-{ let last = ''; try { last = localStorage.getItem('dub-studio-last') || ''; } catch { /* */ }
-  if (last) Store.loadMeta(last).then(m => { if (!m) return; const b = $('goLast'); b.hidden = false; b.querySelector('span')!.textContent = m.title || 'Untitled';
-    b.addEventListener('click', async () => { A.ensure(); go(); await openSong(m); playToggle(); }); }); }
+// Continue: the song on the desk (back to it as it is), or the last one played (opened from storage)
+let contSong: Store.SongMeta | null = null;
+async function refreshContinue() {
+  const b = $('goLast'), cur = A.song.id && A.song.stems.some(st => st.meta);
+  if (cur) { contSong = null; b.hidden = false; b.querySelector('span')!.textContent = A.song.title || 'Untitled'; }
+  else { let last = ''; try { last = localStorage.getItem('dub-studio-last') || ''; } catch { /* */ }
+    contSong = last ? await Store.loadMeta(last) : null; b.hidden = !contSong; if (contSong) b.querySelector('span')!.textContent = contSong.title || 'Untitled'; }
+  $('goDemo').classList.toggle('alt', !$('goLast').hidden);   // with a song to go back to, Continue is the main button
+  Store.listSongs().then(l => { $('goLib').hidden = !l.length; });
+}
+$('goLast').addEventListener('click', async () => { A.ensure(); go(); if (contSong) { const m = contSong; contSong = null; await openSong(m); playToggle(); } });
+refreshContinue();
+// the logo: back to the main menu (the song keeps playing until you choose something else)
+function showMenu() { closeSheets(); pages.forEach(x => { $(x).hidden = true; }); if (tour.on) tour.close(); refreshContinue(); $('start').hidden = false; }
+document.querySelectorAll<HTMLElement>('.brand').forEach(b => { b.setAttribute('role', 'button'); b.setAttribute('aria-label', 'Main menu'); control(b, { undoable: false, up: () => { tick(); showMenu(); } }); });
 const standalone = matchMedia('(display-mode: standalone)').matches || (navigator as Navigator & { standalone?: boolean }).standalone;
 if (/iPhone|iPad|iPod/.test(navigator.userAgent) && !standalone) $('install').hidden = false;
 const go = () => { $('start').hidden = true; requestAnimationFrame(redraw); firstTour(); };
@@ -593,13 +625,12 @@ $('goDemo').addEventListener('click', async () => { A.ensure(); go(); await load
 $('goLoad').addEventListener('click', () => { A.ensure(); ($('startFiles') as HTMLInputElement).click(); });
 $('goSplit').addEventListener('click', () => { A.ensure(); go(); openSplit(); });
 $('goLib').addEventListener('click', () => { A.ensure(); go(); openLibrary(); });
-Store.listSongs().then(l => { if (l.length) $('goLib').hidden = false; });
 $('startFiles').addEventListener('change', e => { const i = e.target as HTMLInputElement; const fs = [...(i.files || [])]; i.value = ''; if (fs.length) { go(); loadMany(fs); } });
 if (navigator.storage?.persist) navigator.storage.persisted().then(p => { if (!p && standalone) navigator.storage.persist(); }).catch(() => {});
 
 function fit() { const big = innerWidth >= 700 && innerHeight >= 700, z = big ? Math.max(1, Math.min(1.6, innerHeight / 820, innerWidth / 480)) : 1; document.documentElement.style.setProperty('--z', z.toFixed(3)); requestAnimationFrame(redraw); }
 fit(); addEventListener('resize', fit);
 redraw(); icon(); drawLoop(); save();
-(window as unknown as { __dub: unknown }).__dub = { meters: A.meters };   // read by the end-to-end tests
+(window as unknown as { __dub: unknown }).__dub = { meters: A.meters, pan: A.panOf };   // read by the end-to-end tests
 // offline: the service worker caches the app as it loads (production builds only)
 if (import.meta.env.PROD && 'serviceWorker' in navigator) addEventListener('load', () => navigator.serviceWorker.register('./sw.js').catch(() => {}));

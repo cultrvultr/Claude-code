@@ -120,13 +120,13 @@
 </div>
 
 <!-- Start -->
-<div id="start">
+<div id="start" class="scroll">
   <div class="wrap">
     <h1>Pocket<span>Dub Studio</span></h1>
     <div class="lfds" aria-hidden="true"><div class="lfd"><i><b style="top:12%"></b></i></div><div class="lfd"><i><b style="top:30%"></b></i></div><div class="lfd"><i><b style="top:64%"></b></i></div><div class="lfd"><i><b style="top:20%"></b></i></div></div>
-    <p class="sub">Any four tracks. Faders, filters, tape echo, spring verb, siren.</p>
-    <button id="goDemo" class="go">Play the demo</button>
+    <p class="sub">4 to 8 tracks. Faders, filters, tape echo, spring verb, siren.</p>
     <button id="goLast" class="go" hidden>Continue <span></span></button>
+    <button id="goDemo" class="go">Play the demo</button>
     <button id="goLoad" class="go alt">Load your tracks</button>
     <button id="goSplit" class="go alt">Split a song into parts</button>
     <button id="goLib" class="go alt" hidden>Library</button>
@@ -141,6 +141,7 @@
   <label class="fld"><span>Title</span><input id="fTitle" type="text" maxlength="60"></label>
   <label class="fld"><span>Tempo (BPM)</span><input id="fBpm" type="number" min="40" max="220" step="0.1" inputmode="decimal"></label>
   <p class="note" id="bpmNote"></p>
+  <label class="spread"><input type="checkbox" id="fSpread" checked><span>Stereo spread<small>Places each part left or right by its name. Fine-tune with Pan below.</small></span></label>
   <div id="slots"></div>
   <button class="wide" id="loadAll">Load 4 to 8 files at once</button>
   <button class="wide" id="splitBtn">Split a full song into parts</button>
@@ -200,9 +201,11 @@
     <dt>FX</dt><dd>Sync or Free time, width, echo tone, echo into verb, and the reverb's type, decay and cuts.</dd>
     <dt>Mix A B C D</dt><dd>Hold a letter to store the whole mix (faders, sends, cuts, echo and verb). Tap it to bring the mix back, mid-song.</dd>
     <dt>Rec</dt><dd>Records what you hear. Share or save it when you stop.</dd>
+    <dt>Pan, Stereo spread</dt><dd>Songs open in stereo: each part is placed left or right by its name (drums, bass and vocals stay in the middle). Turn Stereo spread off in the Song sheet for mono, or move any part with its Pan slider.</dd>
     <dt>Nudge</dt><dd>In the Song sheet, each track has a Nudge in milliseconds to line up parts that were exported a little early or late.</dd>
     <dt>Split</dt><dd>No stems? Split a full song into Drums, Bass, Other, Vocals, Guitar and Keys right on the phone (Song sheet or start screen). The first time downloads the 285 MB model: use Wi-Fi.</dd>
     <dt>Library</dt><dd>Every song you load or split is kept on the phone with its own mix, A–D and takes. Open it from the Song sheet. Share any part as a WAV, or export the whole song to move it to another device.</dd>
+    <dt>Main menu</dt><dd>Tap the Dub Studio logo for the main menu: continue the song you are on, play the demo, load or split a song, or open the Library.</dd>
     <dt>Song</dt><dd>Tap the title to load your tracks (4 to 8: break out vocals, guitar, keys…), rename them and set the tempo. With more than 4, swipe sideways across the strips to switch between channels 1–4 and 5–8 (or tap 1–4 / 5–8 above them).</dd>
     <dt>No sound</dt><dd>Volume up. Bluetooth headphones add delay to the pads: use wired or the speaker to play live.</dd>
   </dl>

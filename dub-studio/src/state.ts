@@ -1,6 +1,6 @@
 // All the mix state, saved to localStorage, with an undo stack of whole-mix snapshots.
 
-export interface Chan { cut: number; echo: number; verb: number; fader: number; mute: boolean; solo: boolean }
+export interface Chan { cut: number; echo: number; verb: number; fader: number; mute: boolean; solo: boolean; pan: number }   // pan -1 (left) .. 1 (right)
 export interface Mix {
   rep: number; dly: number; sync: boolean; div: number; width: number; bass: number; treb: number;
   e2v: number; ret: number;
@@ -17,7 +17,7 @@ export const LPF = [10000, 8000, 6000, 5000, 4000, 3000, 2000, 1000, 500, 250];
 export const VLC = [0, 70, 100, 150, 250, 500, 1000, 2000, 3000, 5000, 7500];
 export const VHC = [0, 10000, 8000, 6000, 5000, 4000, 3000, 2000, 1000, 500, 250];
 
-export const freshChan = (): Chan => ({ cut: 0, echo: 0, verb: 0, fader: 1, mute: false, solo: false });
+export const freshChan = (): Chan => ({ cut: 0, echo: 0, verb: 0, fader: 1, mute: false, solo: false, pan: 0 });
 export const freshMix = (): Mix => ({
   rep: 6, dly: 0.45, sync: true, div: 3, width: 0, bass: 0, treb: -1, e2v: 0.55, ret: 1,
   vIr: 0, vDec: 0, vLc: 3, vHc: 0, vRet: 1,

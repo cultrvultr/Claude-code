@@ -24,7 +24,7 @@ const qdb = (q: number) => 20 * Math.log10(q);   // Web Audio's LP/HP Q is in dB
 const T9 = { lp: 0.713, hp: 1 / 0.713, q: 2.55, far: 16.8 };   // stepped-filter voicing: resonant pair + far pole
 
 interface Ch { inp: GainNode; hp1: BiquadFilterNode; hp2: BiquadFilterNode; lp1: BiquadFilterNode; lp2: BiquadFilterNode;
-  clean: GainNode; crunch: GainNode; fader: GainNode; mute: GainNode; solo: GainNode; echo: GainNode; throwG: GainNode; verb: GainNode; meter: AnalyserNode }
+  clean: GainNode; crunch: GainNode; pan: StereoPannerNode; fader: GainNode; mute: GainNode; solo: GainNode; echo: GainNode; throwG: GainNode; verb: GainNode; meter: AnalyserNode }
 
 export const song: Song = { id: '', title: '', bpm: 75, bpmAuto: true, sr: 48000, gain: 1, cues: [], count: 4, stems: DEFAULT_NAMES.map(name => ({ name, meta: null })) };
 export let ctx: AudioContext | null = null;
@@ -79,12 +79,13 @@ async function build() {
     const sh = c.createWaveShaper(); sh.curve = curve; sh.oversample = '2x'; shIn.gain.value = 1 / 1.6; crunch.gain.value = 0; echo.gain.value = 0; throwG.gain.value = 0; verb.gain.value = 0;
     const hp1 = bq('highpass', 10, 0.707), hp2 = bq('highpass', 10, 0.5), lp1 = bq('lowpass', 22000, 0.707), lp2 = bq('lowpass', 22000, 0.5);
     const meter = c.createAnalyser(); meter.fftSize = 512;
+    const pan = c.createStereoPanner();   // before the fader, so the echo and verb sends keep each part's place
     inp.connect(clean); clean.connect(sum); inp.connect(shIn); shIn.connect(sh); sh.connect(crunch); crunch.connect(sum);
-    sum.connect(hp1); hp1.connect(hp2); hp2.connect(lp1); lp1.connect(lp2); lp2.connect(fader); fader.connect(mute); mute.connect(solo);
+    sum.connect(hp1); hp1.connect(hp2); hp2.connect(lp1); lp1.connect(lp2); lp2.connect(pan); pan.connect(fader); fader.connect(mute); mute.connect(solo);
     solo.connect(master); solo.connect(meter); solo.connect(verb); verb.connect(verbIn); solo.connect(echo); echo.connect(echoBus); solo.connect(throwG); throwG.connect(echoBus);
-    ch.push({ inp, hp1, hp2, lp1, lp2, clean, crunch, fader, mute, solo, echo, throwG, verb, meter });
+    ch.push({ inp, hp1, hp2, lp1, lp2, clean, crunch, pan, fader, mute, solo, echo, throwG, verb, meter });
   }
-  for (let i = 0; i < N; i++) for (const p of ['cut', 'fader', 'mute', 'echo', 'verb'] as const) applyChan(i, p);
+  for (let i = 0; i < N; i++) for (const p of ['cut', 'fader', 'mute', 'echo', 'verb', 'pan'] as const) applyChan(i, p);
   applySolo();
   try {
     await c.audioWorklet.addModule(workletUrl);
@@ -96,9 +97,10 @@ async function build() {
 }
 
 // ---------- channels ----------
-export function applyChan(i: number, p: 'cut' | 'fader' | 'mute' | 'echo' | 'verb') {
+export function applyChan(i: number, p: 'cut' | 'fader' | 'mute' | 'echo' | 'verb' | 'pan') {
   if (!ctx) return; const s = ch[i], q = S.ch[i];
   if (p === 'fader') ramp(s.fader.gain, q.fader * q.fader);
+  if (p === 'pan') ramp(s.pan.pan, Math.max(-1, Math.min(1, q.pan || 0)), 0.03);
   if (p === 'mute') ramp(s.mute.gain, q.mute ? 0 : 1, 0.008);
   if (p === 'verb') ramp(s.verb.gain, q.verb * q.verb * 1.5);
   if (p === 'echo') ramp(s.echo.gain, Math.pow(q.echo, 1.5));
@@ -110,6 +112,7 @@ export function applyChan(i: number, p: 'cut' | 'fader' | 'mute' | 'echo' | 'ver
     ramp(s.clean.gain, st ? 0 : 1, 0.02); ramp(s.crunch.gain, st ? 1 : 0, 0.02);
   }
 }
+export const panOf = (i: number) => ch[i] ? ch[i].pan.pan.value : 0;   // for the tests
 export function setThrow(i: number, on: boolean) { if (ctx) ramp(ch[i].throwG.gain, on ? 1 : 0, on ? 0.006 : 0.03); }
 // solo: when any channel is soloed, the others are silenced (sends too, since the gate sits before them)
 export function applySolo() { if (!ctx) return; const any = S.ch.some(c => c.solo); S.ch.forEach((c, i) => ramp(ch[i].solo.gain, any && !c.solo ? 0 : 1, 0.008)); }

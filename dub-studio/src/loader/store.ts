@@ -9,7 +9,7 @@ export const SEG = 10;   // seconds per piece
 
 export interface StemMeta { name: string; n: number; ch: number; dur: number; peaks: number[]; ms: number; offset: number; file?: string }
 export interface SongMeta { id: string; title: string; bpm: number; bpmAuto?: boolean; sr: number; seg: number; gain: number; stems: (StemMeta | null)[]; cues: number[]; created: number; played?: number;
-  mix?: unknown; snaps?: (string | null)[]; source?: 'files' | 'split' | 'demo' }
+  mix?: unknown; snaps?: (string | null)[]; source?: 'files' | 'split' | 'demo'; spread?: boolean }
 
 const mem = new Map<string, (Int16Array | null)[]>();   // `${songId}/${stem}` -> pieces OPFS could not take (null: that one is in OPFS)
 export function adoptPieces(songId: string, stem: number, pieces: (Int16Array | null)[]) { mem.set(`${songId}/${stem}`, pieces); }
