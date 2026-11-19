@@ -7,7 +7,6 @@ import { makeTour, MIXER_TOUR } from './ui/tour';
 import * as A from './audio/engine';
 import { SPECS } from './audio/irs';
 import { DEMO } from './audio/demo';
-import DemoWorker from './audio/demo.worker.ts?worker';
 import * as Store from './loader/store';
 import * as Split from './split/split';
 import { control, guardPage, clamp, xFrac, abandonWithin } from './ui/control';
@@ -455,18 +454,24 @@ async function openSong(m: Store.SongMeta) {
 async function loadDemo() {
   await A.ensure();
   const id = DEMO.id, old = await Store.loadMeta(id);
-  if (old && old.sr === A.ctx!.sampleRate && (!Store.inMemory(id) ? await Store.readPiece(id, 0, 0) : true)) { await openSong(old); return; }   // made before: open it
-  Store.deleteSong('demo');   // the first demo song, replaced by this one
-  toast('Making the demo song…', 20000);
+  if (old && old.sr === A.ctx!.sampleRate && (!Store.inMemory(id) ? await Store.readPiece(id, 0, 0) : true)) { await openSong(old); return; }   // loaded before: open it
+  for (const o of DEMO.old) Store.deleteSong(o);   // earlier demo songs
   await Store.deleteSong(id);
-  newSong(DEMO.names.length, DEMO.title, id); A.song.bpm = DEMO.bpm; A.song.bpmAuto = false; source = 'demo';
-  DEMO.names.forEach((nm, i) => { A.song.stems[i].name = nm; A.song.stems[i].status = 'Waiting…'; }); redraw();
-  const w = new DemoWorker(), sr = A.ctx!.sampleRate;
+  newSong(DEMO.parts.length, DEMO.title, id); A.song.bpm = DEMO.bpm; A.song.bpmAuto = false; source = 'demo';
+  DEMO.parts.forEach(([nm], i) => { A.song.stems[i].name = nm; A.song.stems[i].status = 'Waiting…'; }); redraw();
+  toast('Loading the demo song…', 60000);
+  // fetch all six at once (the files are small), decode and cut them into pieces one at a time (memory stays low)
+  const files = DEMO.parts.map(([, f]) => fetch(DEMO.dir + f + '.m4a').then(r => { if (!r.ok) throw new Error('download failed (' + r.status + ')'); return r.blob(); }));
   try {
-    for (let i = 0; i < DEMO.names.length; i++)   // one part at a time: made in a worker, then cut into pieces
-      await stemFrom(i, DEMO.names[i], () => new Promise<Float32Array[]>(ok => { w.onmessage = e => ok([e.data as Float32Array]); w.postMessage({ i, sr }); }));
-  } catch (e) { if (e instanceof Superseded) { Store.deleteSong(id); return; } throw e; }   // left half made: made again next time
-  finally { w.terminate(); }
+    for (let i = 0; i < DEMO.parts.length; i++) {
+      A.song.stems[i].status = 'Downloading…'; redraw();
+      const blob = await files[i];
+      await stemFrom(i, DEMO.parts[i][0], async () => { const b = await A.decodeFile(blob); const out: Float32Array[] = []; for (let k = 0; k < Math.min(2, b.numberOfChannels); k++) out.push(new Float32Array(b.getChannelData(k))); return out; }, DEMO.parts[i][1] + '.m4a');
+    }
+  } catch (e) {
+    if (e instanceof Superseded) { Store.deleteSong(id); return; }   // left half loaded: loaded again next time
+    Store.deleteSong(id); newSong(4, '', ''); redraw(); toast('Could not load the demo: ' + (e as Error).message + '. Check the connection and try again.', 6000); return;
+  }
   finishSong(); toast(DEMO.title.replace(' (demo)', '') + ' · ' + DEMO.bpm + ' BPM');
 }
 

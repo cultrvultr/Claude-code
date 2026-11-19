@@ -57,5 +57,5 @@ npm run test:e2e                   # smoke, channels, phase1, loader, library, f
 npm run test:split                 # the splitter end to end (downloads the model; slow on CPU)
 ```
 
-All DSP, reverbs and the demo song are written for this project (CC0). Fonts: Shrikhand and Courier Prime (SIL OFL).
+Demo song: "Let the Echo Repeat" by the project's owner, split into six parts with htdemucs_6s and shipped as AAC in `public/demo/`. All DSP and reverbs are written for this project (CC0). Fonts: Shrikhand and Courier Prime (SIL OFL).
 Thanks to Kibir La Amlak's [4 Track Pocket Dub Studio](https://www.kibir-la-amlak.com/dubstudio/) for the idea and concept.
