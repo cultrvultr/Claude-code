@@ -41,9 +41,10 @@ Connect this GitHub repo in Cloudflare Pages with:
 - Tempo found from the drums; one loudness trim for the whole song; per-part Nudge (ms); waveforms.
 
 **Stem splitter (Phase 3)**
-- In the cloud: `functions/api/split.ts` (a Cloudflare Pages Function) runs Demucs htdemucs_6s on Replicate. On-device splitting needed ~2.6 GB of memory, more than iPhone Safari allows.
+- In the cloud: `functions/api/split.ts` (a Cloudflare Pages Function) forwards to `modal/splitter.py`, Demucs htdemucs_6s on a Modal T4 GPU. On-device splitting needed ~2.6 GB of memory, more than iPhone Safari allows.
 - Six parts: Drums, Bass, Other, Vocals, Guitar, Keys; parts that come back silent are dropped.
-- Needs two secrets on the Pages project: `REPLICATE_API_TOKEN` and `INVITE_CODE` (people type the invite code once).
+- Setup: add repository secrets `MODAL_TOKEN_ID` and `MODAL_TOKEN_SECRET`. The workflow `dub-splitter-deploy.yml` deploys the splitter and sets `SPLIT_URL` and `SPLIT_KEY` on the Pages project.
+- Songs sent for splitting are deleted from the splitter within an hour.
 
 **Library (Phase 4)**
 - Every song is kept with its own mix, A–D, cues and takes. Open, export (.zip), import, delete.
@@ -51,7 +52,7 @@ Connect this GitHub repo in Cloudflare Pages with:
 
 ## Security
 
-- No accounts, server, database or API keys: the site is static files, and songs never leave the device unless you share them.
+- No accounts or database. The only server code is the splitter: a song leaves the device only when you choose "Split into parts", or when you share it.
 - Song data from storage or an imported zip is untrusted: every field is type-checked and clamped (`cleanMeta` in `src/loader/store.ts`, `applyJson` in `src/state.ts`); imports only write `s<stem>/<k>.pcm` pieces within size limits.
 - `public/_headers`: a strict Content-Security-Policy (scripts only from this site, no framing, no forms), plus HSTS, no-referrer, a locked-down Permissions-Policy, and COOP/COEP.
 - CI actions are pinned to commit SHAs; the Cloudflare token is a GitHub secret limited to Pages.
