@@ -49,6 +49,14 @@ Connect this GitHub repo in Cloudflare Pages with:
 - Every song is kept with its own mix, A–D, cues and takes. Open, export (.zip), import, delete.
 - Any part shares as a WAV. Recorded takes are saved per song.
 
+## Security
+
+- No accounts, server, database or API keys: the site is static files, and songs never leave the device unless you share them.
+- Song data from storage or an imported zip is untrusted: every field is type-checked and clamped (`cleanMeta` in `src/loader/store.ts`, `applyJson` in `src/state.ts`); imports only write `s<stem>/<k>.pcm` pieces within size limits.
+- `public/_headers`: a strict Content-Security-Policy (scripts only from this site, no framing, no forms), plus HSTS, no-referrer, a locked-down Permissions-Policy, and COOP/COEP.
+- CI actions are pinned to commit SHAs; the Cloudflare token is a GitHub secret limited to Pages.
+- `tests/security.cjs` imports a hostile zip (script in every field, prototype pollution, path escapes) and checks nothing runs.
+
 ## Tests
 
 ```bash

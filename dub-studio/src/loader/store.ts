@@ -51,14 +51,36 @@ export async function readPiece(songId: string, stem: number, k: number): Promis
   catch { return null; }
 }
 
+// ---------- song data is untrusted (it can come from a zip someone sent): every field is checked and clamped ----------
+const num = (v: unknown, lo: number, hi: number, d: number) => typeof v === 'number' && Number.isFinite(v) ? Math.min(hi, Math.max(lo, v)) : d;
+const str = (v: unknown, max: number) => typeof v === 'string' ? v.slice(0, max) : '';
+export const SAFE_ID = /^[a-z0-9-]{1,40}$/i;
+export function cleanMeta(raw: unknown): SongMeta | null {
+  if (!raw || typeof raw !== 'object') return null;
+  const m = raw as Record<string, unknown>;
+  if (typeof m.id !== 'string' || !SAFE_ID.test(m.id) || !Array.isArray(m.stems)) return null;
+  const stems = m.stems.slice(0, 8).map((x): StemMeta | null => {
+    if (!x || typeof x !== 'object') return null; const t = x as Record<string, unknown>;
+    return { name: str(t.name, 24) || 'Track', n: Math.round(num(t.n, 0, 4000, 0)), ch: t.ch === 2 ? 2 : 1, dur: num(t.dur, 0, 36000, 0),
+      peaks: Array.isArray(t.peaks) ? t.peaks.slice(0, 400).map(v => num(v, 0, 1, 0)) : [], ms: num(t.ms, 0, 10, 0), offset: Math.round(num(t.offset, -2000, 2000, 0)), file: str(t.file, 200) || undefined };
+  });
+  return { id: m.id, title: str(m.title, 80), bpm: num(m.bpm, 40, 220, 75), bpmAuto: m.bpmAuto === true, sr: Math.round(num(m.sr, 8000, 192000, 48000)), seg: SEG,
+    gain: num(m.gain, 0.05, 8, 1), stems, cues: Array.isArray(m.cues) ? m.cues.slice(0, 12).map(v => num(v, 0, 36000, 0)) : [],
+    created: num(m.created, 0, 1e14, Date.now()), played: num(m.played, 0, 1e14, 0) || undefined,
+    mix: typeof m.mix === 'string' && m.mix.length < 20000 ? m.mix : undefined,
+    snaps: Array.isArray(m.snaps) ? m.snaps.slice(0, 4).map(v => typeof v === 'string' && v.length < 20000 ? v : null) : undefined,
+    source: m.source === 'split' || m.source === 'demo' ? m.source : 'files', spread: m.spread !== false };
+}
+
 export async function saveMeta(meta: SongMeta) {
   try { await writeAt(['songs', meta.id, 'meta.json'], JSON.stringify(meta)); return; } catch { /* no OPFS: kept in localStorage */ }
   try { localStorage.setItem('dub-studio-meta-' + meta.id, JSON.stringify(meta)); } catch { /* full */ }
 }
 export async function loadMeta(id: string): Promise<SongMeta | null> {
+  if (!SAFE_ID.test(id)) return null;
   const f = await fileAt(['songs', id, 'meta.json']);
-  if (f) try { return JSON.parse(await f.text()); } catch { /* bad file */ }
-  try { return JSON.parse(localStorage.getItem('dub-studio-meta-' + id) || 'null'); } catch { return null; }
+  if (f) try { return cleanMeta(JSON.parse(await f.text())); } catch { /* bad file */ }
+  try { return cleanMeta(JSON.parse(localStorage.getItem('dub-studio-meta-' + id) || 'null')); } catch { return null; }
 }
 export async function listSongs(): Promise<SongMeta[]> {
   const out: SongMeta[] = [];
@@ -94,12 +116,20 @@ export async function exportSong(meta: SongMeta, onFile?: (i: number, n: number)
   return makeZip(entries, i => onFile?.(i, entries.length));
 }
 export async function importSong(zip: Blob, onFile?: (i: number, n: number) => void): Promise<SongMeta> {
-  const files = await readZip(zip), mf = files.find(f => f.name === 'meta.json'); if (!mf) throw new Error('not a Dub Studio song');
-  const meta = JSON.parse(await mf.data.text()) as SongMeta;
-  if (!meta.stems || !meta.sr) throw new Error('not a Dub Studio song');
-  meta.id = newSongId(); meta.played = Date.now();   // always a new copy
+  if (zip.size > 2e9) throw new Error('file too large');
+  const files = await readZip(zip); if (files.length > 8 * 4000 + 1) throw new Error('too many files');
+  const mf = files.find(f => f.name === 'meta.json'); if (!mf || mf.data.size > 1e6) throw new Error('not a Dub Studio song');
+  const raw = JSON.parse(await mf.data.text()); if (raw && typeof raw === 'object') raw.id = newSongId();   // always a new copy, under a name we choose
+  const meta = cleanMeta(raw);
+  if (!meta || !meta.stems.some(Boolean)) throw new Error('not a Dub Studio song');
+  meta.played = Date.now();
+  const PIECE_MAX = SEG * 192000 * 2 * 2 + 64;   // 10 s, stereo, 16-bit, at the highest rate
   let i = 0;
-  for (const f of files) { if (/^s\d\/\d+\.pcm$/.test(f.name)) { const [s, k] = f.name.split('/'); await writeAt(['songs', meta.id, s, k], f.data); } onFile?.(++i, files.length); }
+  for (const f of files) {
+    const m = /^s([0-7])\/(\d{1,4})\.pcm$/.exec(f.name);   // nothing but s<stem>/<k>.pcm is ever written
+    if (m && meta.stems[+m[1]] && +m[2] < meta.stems[+m[1]]!.n && f.data.size <= PIECE_MAX && f.data.size % 2 === 0) await writeAt(['songs', meta.id, 's' + m[1], m[2] + '.pcm'], f.data);
+    onFile?.(++i, files.length);
+  }
   await saveMeta(meta); return meta;
 }
 

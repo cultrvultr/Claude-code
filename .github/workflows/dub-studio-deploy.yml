@@ -20,9 +20,12 @@ jobs:
       run:
         working-directory: dub-studio
     steps:
-      - uses: actions/checkout@v4
+      # actions are pinned to exact commits (a moved tag cannot swap in new code that sees the Cloudflare token)
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: '22'
           cache: 'npm'
@@ -31,7 +34,7 @@ jobs:
       - run: npm ci
 
       # the stem splitter model (285 MB, pinned and checksummed in scripts/prepare-assets.mjs)
-      - uses: actions/cache@v4
+      - uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
         with:
           path: dub-studio/node_modules/.cache/htdemucs_6s.onnx
           key: htdemucs6s-a3f5050696cd
@@ -40,7 +43,7 @@ jobs:
 
       # Production branch of the Pages project is "main"; deploying under that name publishes to dub-studio-7il.pages.dev
       - name: Deploy
-        uses: cloudflare/wrangler-action@v3
+        uses: cloudflare/wrangler-action@9acf94ace14e7dc412b076f2c5c20b8ce93c79cd # v3
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
