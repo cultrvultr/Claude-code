@@ -110,9 +110,10 @@ def web():
             return {'status': 'failed', 'error': 'The split expired'}
         except modal.exception.FunctionTimeoutError:
             return {'status': 'failed', 'error': 'The song took too long to split'}
-        except modal.exception.TimeoutError:
+        except (TimeoutError, modal.exception.TimeoutError):
             return {'status': s['status'], 'progress': s.get('progress', 0)}   # still running or waiting
-        except Exception:
+        except Exception as e:
+            print('split', i, 'failed:', type(e).__name__, e)
             return {'status': 'failed', 'error': 'The split failed. Is it a normal audio file?'}
         s = await state.get.aio(i) or s
         return {k: v for k, v in s.items() if k != 't'}
