@@ -11,7 +11,7 @@ const MAX_BYTES = 60 * 1024 * 1024;
 const ID = /^fc-[A-Za-z0-9]{10,40}$/, STEM = /^(drums|bass|other|vocals|guitar|piano)$/;
 
 const json = (o: unknown, status = 200) => new Response(JSON.stringify(o), { status, headers: { 'content-type': 'application/json', 'cache-control': 'no-store' } });
-const ready = (env: Env) => !!env.SPLIT_URL && /^https:\/\/[a-z0-9-]+\.modal\.run\/?$/.test(env.SPLIT_URL) && !!env.SPLIT_KEY;
+const ready = (env: Env) => !!env.SPLIT_URL && /^https:\/\/[a-z0-9-]+(\.[a-z0-9-]+)*\.modal\.run\/?$/.test(env.SPLIT_URL) && !!env.SPLIT_KEY;
 const call = (env: Env, path: string, init: RequestInit = {}) =>
   fetch(env.SPLIT_URL!.replace(/\/$/, '') + path, { ...init, headers: { 'x-key': env.SPLIT_KEY!, ...(init.headers || {}) } });
 async function pass(r: Response) {
