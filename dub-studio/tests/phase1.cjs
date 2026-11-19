@@ -1,4 +1,5 @@
 // Snapshots, tour, offline reload.
+const { openDemo, loadParts } = require('./helpers.cjs');
 const { chromium, devices } = require('playwright');
 const URL = process.env.URL || 'http://localhost:4173/';
 const fail = m => { console.error('FAIL', m); process.exitCode = 1; };
@@ -7,7 +8,7 @@ const hold = async (p, loc, ms) => { const b = await loc.boundingBox(); await p.
   const b = await chromium.launch({ args: ['--autoplay-policy=no-user-gesture-required'] });
   const ctx = await b.newContext({ ...devices['iPhone 15'] }), p = await ctx.newPage();
   const errs = []; p.on('pageerror', e => errs.push(e.message)); p.on('console', m => { if (m.type() === 'error') errs.push(m.text()); });
-  await p.goto(URL); await p.tap('#goDemo'); await p.waitForTimeout(1500);
+  await p.goto(URL); await openDemo(p); await p.waitForSelector('#tour .tip', { state: 'visible', timeout: 30000 }).catch(() => {});
   if (!(await p.isVisible('#tour .tip'))) fail('tour did not open on first visit');
   for (let i = 0; i < 17; i++) { const t = await p.textContent('#tour h3'); if (i === 5 && t !== 'Fader') fail('step 6 is ' + t); await p.click('#tour .next'); }
   if (await p.isVisible('#tour .tip')) fail('tour did not close on Done');
@@ -22,7 +23,7 @@ const hold = async (p, loc, ms) => { const b = await loc.boundingBox(); await p.
   // offline: once the service worker has the app, a reload with no network still shows it
   await p.evaluate(() => navigator.serviceWorker.ready); await p.reload(); await p.waitForTimeout(800);
   await ctx.setOffline(true); await p.reload(); await p.waitForTimeout(800);
-  if (!(await p.isVisible('#goDemo'))) fail('app did not load offline');
+  if (!(await p.isVisible('#goLib'))) fail('app did not load offline');
   await ctx.setOffline(false);
   if (errs.filter(e => !/Failed to load resource|ERR_INTERNET_DISCONNECTED/.test(e)).length) fail('console errors: ' + errs.join(' | '));
   await b.close(); if (!process.exitCode) console.log('PASS phase1');

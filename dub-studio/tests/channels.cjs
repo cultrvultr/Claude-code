@@ -1,4 +1,5 @@
 // 6 named files -> 6 channels in their home slots; bank switch; Mute held = Solo while held.
+const { openDemo, loadParts } = require('./helpers.cjs');
 const { chromium, devices } = require('playwright');
 const URL = process.env.URL || 'http://localhost:4173/';
 const fail = m => { console.error('FAIL', m); process.exitCode = 1; };
@@ -16,7 +17,7 @@ function wav(seconds, hz) {   // mono 16-bit sine
   await p.addInitScript(() => localStorage.setItem('dub-studio-toured', '1'));   // the tour has its own test
   await p.goto(URL);
   const names = ['Song - sax.wav', 'Song - drums.wav', 'Song - vocals.wav', 'Song - bass.wav', 'Song - guitar.wav', 'Song - piano.wav'];
-  await p.setInputFiles('#startFiles', names.map((name, i) => ({ name, mimeType: 'audio/wav', buffer: wav(3, 200 + 100 * i) })));
+  await loadParts(p, names.map((name, i) => ({ name, mimeType: 'audio/wav', buffer: wav(3, 200 + 100 * i) })));
   await p.waitForTimeout(2500);
   const slots = await p.$$eval('.st:not([hidden]) .slot', e => e.map(x => x.textContent));
   if (slots.join(',') !== 'Drums,Bass,Horns,Vocals,Guitar,Keys') fail('slots ' + slots.join(','));   // guitar and keys keep their home slots; the sax fills the free slot 3

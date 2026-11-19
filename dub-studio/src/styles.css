@@ -299,3 +299,15 @@ button { font: inherit; color: inherit; background: none; border: 0; padding: 0;
 .lfds { height: clamp(56px, 10vh, 110px); margin: 4px 0; }
 .go { padding: clamp(11px, 1.8vh, 16px); font-size: clamp(18px, 2.7vh, 22px); }
 #goLast span { margin-top: 3px; }
+/* add a song */
+.addq { font: 400 20px/1.25 var(--display); color: var(--ink); margin: 6px 0 12px; overflow-wrap: anywhere; }
+.choice { display: block; width: 100%; text-align: left; margin-top: 10px; padding: 14px; border-radius: 4px; background: var(--ink); color: var(--paper); border: 1.5px solid var(--ink); }
+.choice b { display: block; font: 400 19px/1.1 var(--display); margin-bottom: 4px; }
+.choice span { display: block; font-size: 13px; line-height: 1.35; opacity: .85; }
+.choice span:empty { display: none; }
+.choice.alt { background: none; color: var(--ink); }
+.choice:disabled { opacity: .45; }
+.link { color: var(--red); font-weight: 700; text-decoration: underline; padding: 0; font-size: inherit; }
+.lib-item .b button.more { flex: 0 0 48px; font-size: 16px; }
+.lib-item .extra { margin-top: 6px; }
+.lib-item.busy .s { margin-bottom: 0; }

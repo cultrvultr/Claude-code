@@ -1,4 +1,5 @@
 // Long file names: the part name drops the shared song name and is never cut off in the strip.
+const { openDemo, loadParts } = require('./helpers.cjs');
 const { chromium, devices } = require('playwright');
 const URL = process.env.URL || 'http://localhost:4173/';
 const fail = m => { console.error('FAIL', m); process.exitCode = 1; };
@@ -7,7 +8,7 @@ function wav(s) { const sr = 22050, n = sr * s, b = Buffer.alloc(44 + n * 2); b.
   const b = await chromium.launch(), p = await (await b.newContext({ ...devices['iPhone 15'] })).newPage();
   await p.addInitScript(() => localStorage.setItem('dub-studio-toured', '1')); await p.goto(URL);
   const names = ['Kingston Session 1977 - Rhythm Guitar Upstroke.wav', 'Kingston Session 1977 - Melodica.wav', 'Kingston Session 1977 - Clavinet.wav', 'Kingston Session 1977 - Nyabinghi.wav'];
-  await p.setInputFiles('#startFiles', names.map(name => ({ name, mimeType: 'audio/wav', buffer: wav(2) })));
+  await loadParts(p, names.map(name => ({ name, mimeType: 'audio/wav', buffer: wav(2) })));
   await p.waitForFunction(() => /Loaded/.test(document.getElementById('toast').textContent), null, { timeout: 30000 }); await p.waitForTimeout(300);
   const r = await p.$$eval('.st:not([hidden]) .slot', e => e.map(x => ({ t: x.textContent, d: [x.scrollWidth, x.clientWidth, x.scrollHeight, x.clientHeight].join('/'), cut: x.scrollWidth > x.clientWidth + 1 || x.scrollHeight > x.clientHeight + 2 })));
   console.log('  ', r.map(x => x.t + (x.cut ? ' (CUT)' : '')).join(' | '), '· title:', await p.textContent('#songBtn'));

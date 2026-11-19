@@ -1,4 +1,5 @@
 // Feel: buttons act on touch-down, knobs show a value bubble and go fine when dragged slowly,
+const { openDemo, loadParts } = require('./helpers.cjs');
 // and the mixer does almost no layout while it plays untouched (meters and playhead move by transform).
 const { chromium, devices } = require('playwright');
 const URL = process.env.URL || 'http://localhost:4173/';
@@ -8,7 +9,7 @@ const fail = m => { console.error('FAIL', m); process.exitCode = 1; };
   const ctx = await b.newContext({ ...devices['iPhone 15'] }), p = await ctx.newPage();
   const errs = []; p.on('pageerror', e => errs.push(e.message)); p.on('console', m => { if (m.type() === 'error') errs.push(m.text()); });
   await p.addInitScript(() => localStorage.setItem('dub-studio-toured', '1'));
-  await p.goto(URL); await p.tap('#goDemo');
+  await p.goto(URL); await openDemo(p);
   await p.waitForFunction(() => /BPM/.test(document.getElementById('toast').textContent), null, { timeout: 60000 });   // the demo is made
   await p.waitForFunction(() => { const m = /^0:(\d\d)/.exec(document.getElementById('time').textContent); return m && +m[1] >= 15; }, null, { timeout: 60000 });   // past the intro: the kick is in
   const cdp = await ctx.newCDPSession(p); await cdp.send('Performance.enable');

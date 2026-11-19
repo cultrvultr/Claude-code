@@ -1,4 +1,5 @@
 // Swipe across the strips to switch banks; a swipe that starts on a fader or knob does not move it.
+const { openDemo, loadParts } = require('./helpers.cjs');
 const { chromium, devices } = require('playwright');
 const URL = process.env.URL || 'http://localhost:4173/';
 const fail = m => { console.error('FAIL', m); process.exitCode = 1; };
@@ -7,7 +8,7 @@ function wav(s) { const sr = 22050, n = sr * s, b = Buffer.alloc(44 + n * 2); b.
   const b = await chromium.launch(), p = await (await b.newContext({ ...devices['iPhone 15'] })).newPage();
   const errs = []; p.on('pageerror', e => errs.push(e.message)); p.on('console', m => { if (m.type() === 'error') errs.push(m.text()); });
   await p.addInitScript(() => localStorage.setItem('dub-studio-toured', '1')); await p.goto(URL);
-  await p.setInputFiles('#startFiles', ['drums', 'bass', 'other', 'vocals', 'guitar', 'keys'].map(n => ({ name: `Song ${n}.wav`, mimeType: 'audio/wav', buffer: wav(2) })));
+  await loadParts(p, ['drums', 'bass', 'other', 'vocals', 'guitar', 'keys'].map(n => ({ name: `Song ${n}.wav`, mimeType: 'audio/wav', buffer: wav(2) })));
   await p.waitForFunction(() => /Loaded/.test(document.getElementById('toast').textContent), null, { timeout: 30000 }); await p.waitForTimeout(300);
   const vis = () => p.$$eval('.st:not([hidden]):not(.off) .slot', e => e.map(x => x.textContent).join(','));
   const swipe = async (sel, dx, ms = 160) => { const r = await p.locator(sel).first().boundingBox(), x = r.x + r.width / 2, y = r.y + r.height / 2;

@@ -68,13 +68,13 @@ document.querySelectorAll<HTMLElement>('.st').forEach(st => {
       tick(); q.mute = !q.mute; A.applyChan(c, 'mute'); muteDraws.forEach(f => f()); } });
   const slot = st.querySelector<HTMLElement>('.slot')!;
   draws.push(() => { const s = A.song.stems[c], t = s.status ? '…' : s.name; if (slot.textContent !== t) { slot.textContent = t; fitName(slot); } slot.classList.toggle('empty', !s.meta); st.hidden = c >= A.song.count; });
-  control(slot, { undoable: false, up: () => pickOne(c) });
+  control(slot, { undoable: false, up: () => { if (!A.song.id) { openLibrary(); return; } slotsDraw(); openSheet('songSheet'); } });
 });
 // banks: phones show 4 strips at a time; 1-4 / 5-8 switches when there are more than 4 tracks
 let bank = 0;
 function drawBank() {
   const many = A.song.count > 4, wide = innerWidth >= 700;
-  $('banks').hidden = !many || wide; strips.style.setProperty('--cols', String(wide ? A.song.count : 4));
+  $('banks').hidden = !many || wide; strips.style.setProperty('--cols', String(wide ? A.song.count : Math.min(4, A.song.count)));
   if (!many || wide) bank = 0;
   strips.querySelectorAll<HTMLElement>('.st').forEach((st, c) => st.classList.toggle('off', !wide && many && Math.floor(c / 4) !== bank));
   $('banks').querySelectorAll<HTMLElement>('i').forEach((b, i) => { b.classList.toggle('on', i === bank); b.textContent = i ? `5–${A.song.count}` : '1–4'; });
@@ -246,7 +246,7 @@ let scrub: number | null = null;
 function icon() { $('playIcon').innerHTML = A.playing ? '<path d="M5 3h3.5v14H5zM11.5 3H15v14h-3.5z"/>' : '<path d="M5 3l12 7-12 7z"/>'; $('play').setAttribute('aria-label', A.playing ? 'Pause' : 'Play'); }
 async function playToggle() {
   await A.ensure();
-  if (!A.dur()) { openSheet('songSheet'); toast('Load your tracks first'); return; }
+  if (!A.dur()) { openLibrary(); toast('Open a song or add one'); return; }
   if (A.playing) { A.stop(); letSleep(); silentAudio.pause(); } else { A.play(); keepAwake(); silentAudio.play().catch(() => {}); latencyCheck(); }
   icon(); media();
 }
@@ -362,7 +362,7 @@ function songMeta(): Store.SongMeta {
 }
 let created = Date.now(), source: Store.SongMeta['source'] = 'files', persistAsked = false, spread = true;
 // stereo spread: each part gets a place from its name (the low end and the voice stay in the middle)
-const PLACES: [RegExp, number][] = [[/drum|kick|snare|kit|beat/i, 0], [/bass|sub/i, 0], [/vox|vocal|voice|sing|lead vo/i, 0],
+const PLACES: [RegExp, number][] = [[/^mix$|master|full/i, 0], [/drum|kick|snare|kit|beat/i, 0], [/bass|sub/i, 0], [/vox|vocal|voice|sing|lead vo/i, 0],
   [/guit|gtr|chop|skank/i, -0.35], [/key|organ|piano|synth|pad|clav|rhodes/i, 0.35], [/perc|shak|tamb|conga|bongo|hand|nyab|bell/i, 0.5],
   [/horn|brass|sax|trump|tromb|flute|melod|harmonica/i, -0.25], [/fx|effect|noise/i, 0.2], [/other|inst|music|backing/i, -0.1]];
 const placeOf = (name: string, c: number) => PLACES.find(([r]) => r.test(name))?.[1] ?? (c % 2 ? 0.25 : -0.25);
@@ -397,8 +397,11 @@ async function stemFrom(c: number, name: string, channels: () => Promise<Float32
   status(c, 'Decoding…');
   const data = await channels(); same();
   status(c, 'Saving…');
-  const r = await Store.pieceStem(id, c, A.song.sr, data); same();
-  A.song.stems[c].meta = { name, n: r.n, ch: r.ch, dur: r.dur, peaks: r.peaks, ms: r.ms, offset: 0, file };
+  const used = A.song.stems.map((s, i) => i !== c && s.meta ? Store.dirOf(s.meta, i) : -1), old = A.song.stems[c].meta;
+  let dir = 0; while (used.includes(dir)) dir++;
+  const r = await Store.pieceStem(id, dir, A.song.sr, data); same();
+  if (old && Store.dirOf(old, c) !== dir) Store.deleteStem(id, Store.dirOf(old, c));
+  A.song.stems[c].meta = { name, n: r.n, ch: r.ch, dur: r.dur, peaks: r.peaks, ms: r.ms, offset: 0, file, dir: dir === c ? undefined : dir };
   A.song.stems[c].name = name; onsetsBy.set(c, { on: r.onsets, hop: r.hop }); loadedNow.add(c);
   status(c, undefined);
 }
@@ -408,7 +411,7 @@ function finishSong() {
   if (A.song.bpmAuto) { const src = onsetsBy.get(0) || onsetsBy.values().next().value; const bpm = src ? Store.detectBpm(src.on, A.song.sr, src.hop) : null; if (bpm) { A.song.bpm = bpm; echoChange(); } }
   A.setSongGain(Store.songGain(A.song.stems.slice(0, A.song.count).map(s => s.meta?.ms || 0)));
   applySpread(false);
-  onsetsBy.clear(); saveSong(true); redraw(); slotsDraw(); drawLoop(); drawCues(); media();
+  onsetsBy.clear(); saveSong(true); redraw(); slotsDraw(); drawLoop(); drawCues(); media(); firstTour();
 }
 function newSong(count: number, title: string, id = Store.newSongId()) {
   if (A.playing) { A.stop(); icon(); letSleep(); }
@@ -420,7 +423,6 @@ function newSong(count: number, title: string, id = Store.newSongId()) {
 }
 async function loadInto(c: number, f: File) {
   await A.ensure();
-  if (!A.song.id) newSong(Math.max(4, c + 1), base(f));
   const wasPlaying = A.playing, t = A.now(); if (wasPlaying) A.stop();
   const name = partName(f, [f]);
   try { await stemFrom(c, name, fromFile(f), f.name); A.songChanged(); }
@@ -445,11 +447,11 @@ async function loadMany(files: File[]) {
 function commonName(fs: File[]) { const n = fs.map(base); let p = n[0] || ''; for (const x of n) while (!x.startsWith(p)) p = p.slice(0, -1); p = p.replace(/[\s_\-.(]+$/, ''); return p.length > 2 ? p : 'My song'; }
 async function openSong(m: Store.SongMeta) {
   await A.ensure();
-  newSong(Math.max(4, m.stems.length), m.title, m.id);
+  newSong(Math.max(1, m.stems.length), m.title, m.id);
   Object.assign(A.song, { bpm: m.bpm, bpmAuto: m.bpmAuto ?? false, sr: m.sr, cues: m.cues || [] }); created = m.created; source = m.source || 'files'; spread = m.spread ?? true; loadedNow.clear();
   setMix(m.mix); setSnaps(m.snaps); applyAll();
   m.stems.forEach((st, i) => { if (st) { A.song.stems[i].meta = st; A.song.stems[i].name = st.name; } });
-  A.setSongGain(m.gain); echoChange(); saveSong(); redraw(); slotsDraw(); drawLoop(); drawCues(); media();
+  A.setSongGain(m.gain); echoChange(); saveSong(); redraw(); slotsDraw(); drawLoop(); drawCues(); media(); firstTour();
 }
 async function loadDemo() {
   await A.ensure();
@@ -478,9 +480,7 @@ async function loadDemo() {
 let pickSlot = 0;
 function pickOne(c: number) { pickSlot = c; ($('oneFile') as HTMLInputElement).click(); }
 $('oneFile').addEventListener('change', e => { const i = e.target as HTMLInputElement; const f = i.files?.[0]; if (f) loadInto(pickSlot, f); i.value = ''; });
-$('allFiles').addEventListener('change', e => { const i = e.target as HTMLInputElement; loadMany([...(i.files || [])]); i.value = ''; });
-control($('loadAll'), { undoable: false, up: () => ($('allFiles') as HTMLInputElement).click() });
-control($('loadDemo'), { undoable: false, up: () => { closeSheets(); loadDemo(); } });
+$('partsFiles').addEventListener('change', e => { const i = e.target as HTMLInputElement; const fs = [...(i.files || [])]; i.value = ''; if (fs.length) { go(); loadMany(fs); } });   // tests only: no button
 
 const wave = (peaks: number[], h = 22) => { const W = peaks.length; return `<svg class="wave" viewBox="0 0 ${W} ${h}" preserveAspectRatio="none"><path d="${peaks.map((p, x) => `M${x} ${(h / 2 - p * h / 2).toFixed(1)}V${(h / 2 + p * h / 2).toFixed(1)}`).join('')}"/></svg>`; };
 const esc = (t: string) => t.replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]!));
@@ -493,11 +493,10 @@ function slotsDraw() {
       <span>${s.status || (s.meta ? fmt(s.meta.dur) + (s.meta.ch === 1 ? ' mono' : '') : 'empty')}</span><button data-load="${i}">Load</button>
       ${s.meta ? `<div class="wv">${wave(s.meta.peaks)}<label>Nudge <input type="number" data-off="${i}" value="${s.meta.offset}" step="5" min="-2000" max="2000" inputmode="numeric"> ms</label><button class="share" data-wav="${i}">WAV</button></div>
       <div class="pn"><span>Pan</span><input type="range" data-pan="${i}" min="-100" max="100" step="1" value="${Math.round((S.ch[i].pan || 0) * 100)}" aria-label="Track ${i + 1} pan"><b data-panv="${i}">${panLab(S.ch[i].pan || 0)}</b></div>` : ''}</div>`).join('')
-    + `<div class="slotadd">${A.song.count < A.N ? '<button id="addTrack">+ Add track</button>' : ''}${A.song.count > 4 ? '<button id="delTrack">− Remove last</button>' : ''}${A.song.cues.length ? '<button id="clearCues">Clear cues</button>' : ''}</div>`;
+    + `<div class="slotadd">${A.song.count < A.N ? '<button id="addTrack">+ Add track</button>' : ''}${A.song.count > 1 ? '<button id="delTrack">− Remove last</button>' : ''}${A.song.cues.length ? '<button id="clearCues">Clear cues</button>' : ''}</div>`;
   $('slots').querySelectorAll<HTMLInputElement>('input[data-i]').forEach(inp => inp.addEventListener('input', () => { A.song.stems[+inp.dataset.i!].name = inp.value || '—'; redraw(); saveSong(); }));
   $('slots').querySelectorAll<HTMLInputElement>('input[data-off]').forEach(inp => inp.addEventListener('change', () => { const m = A.song.stems[+inp.dataset.off!].meta; if (!m) return;
     m.offset = clamp(Math.round(+inp.value || 0), -2000, 2000); inp.value = String(m.offset); A.songChanged(); if (A.playing) A.play(A.now()); saveSong(); }));
-  $('slots').querySelectorAll<HTMLElement>('[data-load]').forEach(b => b.addEventListener('click', () => pickOne(+b.dataset.load!)));
   $('slots').querySelectorAll<HTMLInputElement>('input[data-pan]').forEach(inp => {
     const i = +inp.dataset.pan!, lab = $('slots').querySelector<HTMLElement>(`[data-panv="${i}"]`)!;
     inp.addEventListener('pointerdown', () => gestureStart());
@@ -508,50 +507,65 @@ function slotsDraw() {
   ($('fSpread') as HTMLInputElement).checked = spread;
   $('slots').querySelectorAll<HTMLElement>('[data-wav]').forEach(b => b.addEventListener('click', async () => { const i = +b.dataset.wav!;
     try { await shareBlob(await Store.stemWav(songMeta(), i), `${fileSafe(A.song.title)}-${fileSafe(A.song.stems[i].name)}.wav`); } catch (e) { toast('Could not export: ' + (e as Error).message); } }));
+  $('slots').querySelectorAll<HTMLElement>('[data-load]').forEach(b => b.addEventListener('click', () => pickOne(+b.dataset.load!)));
   document.getElementById('addTrack')?.addEventListener('click', () => { A.song.count++; bank = Math.floor((A.song.count - 1) / 4); slotsDraw(); redraw(); saveSong(); });
-  document.getElementById('delTrack')?.addEventListener('click', () => { const i = --A.song.count; const st = A.song.stems[i]; st.meta = null; st.name = A.DEFAULT_NAMES[i];
-    S.ch[i].solo = false; A.applySolo(); if (A.playing) A.play(A.now()); slotsDraw(); redraw(); saveSong(); });
+  document.getElementById('delTrack')?.addEventListener('click', () => { const i = --A.song.count; const st = A.song.stems[i]; if (st.meta) Store.deleteStem(A.song.id, Store.dirOf(st.meta, i)); st.meta = null; st.name = A.DEFAULT_NAMES[i];
+    S.ch[i].solo = false; A.applySolo(); A.songChanged(); if (A.playing) A.play(A.now()); bank = Math.min(bank, Math.floor((A.song.count - 1) / 4)); slotsDraw(); redraw(); saveSong(); });
   document.getElementById('clearCues')?.addEventListener('click', () => { A.song.cues = []; drawCues(); slotsDraw(); saveSong(); });
 }
 $('fSpread').addEventListener('change', e => { gestureStart(); spread = (e.target as HTMLInputElement).checked; applySpread(true); gestureEnd(); saveSong(); slotsDraw(); });
 $('fTitle').addEventListener('input', e => { A.song.title = (e.target as HTMLInputElement).value; $('songBtn').textContent = A.song.title || 'Untitled'; saveSong(); media(); });
 $('fBpm').addEventListener('change', e => { const v = +(e.target as HTMLInputElement).value; if (v >= 40 && v <= 220) { A.song.bpm = v; A.song.bpmAuto = false; echoChange(); saveSong(); slotsDraw(); } });
-draws.push(() => { $('songBtn').textContent = A.song.title || 'Load tracks'; });
-control($('songBtn'), { undoable: false, up: () => { slotsDraw(); openSheet('songSheet'); } });
+draws.push(() => { $('songBtn').textContent = A.song.title || 'Open a song'; });
+control($('songBtn'), { undoable: false, up: () => { if (!A.song.id) { openLibrary(); return; } slotsDraw(); openSheet('songSheet'); } });
 
-// ---------- splitter ----------
-let splitting = false;
+// ---------- add a song: one file, then split it into parts or keep it as one track ----------
+let splitting = '', addPending: File | null = null;   // splitting: the title of the song being split
 const mmss = (s: number) => s >= 60 ? `${Math.floor(s / 60)} min ${Math.round(s % 60)} s` : `${Math.round(s)} s`;
-async function openSplit() {
-  slotsDraw(); closeSheets(); openSheet('splitSheet'); $('splitRun').hidden = !splitting;
-  $('splitModel').textContent = (await Split.modelSaved()) ? 'The splitter model is saved on this phone.' : `The first split downloads the splitter model: ${Split.MODEL_MB} MB, once. Use Wi-Fi.`;
+async function askAdd(f: File) {
+  addPending = f; $('addName').textContent = base(f); $('addAsk').hidden = false; $('splitRun').hidden = true;
+  ($('addSplit') as HTMLButtonElement).disabled = !!splitting;
+  closeSheets(); openSheet('addSheet');
+  $('splitModel').textContent = splitting ? 'Another song is splitting. Wait for it to finish.' : (await Split.modelSaved()) ? '' : `The first split downloads the splitter (${Split.MODEL_MB} MB, once). Use Wi-Fi.`;
+}
+async function keepWhole(f: File) {
+  await A.ensure(); go(); closeSheets();
+  newSong(1, base(f)); A.song.stems[0].name = 'Mix'; A.song.stems[0].status = 'Waiting…'; redraw();
+  try { await stemFrom(0, 'Mix', fromFile(f), f.name); }
+  catch (e) { if (e instanceof Superseded) return; await Store.deleteSong(A.song.id); newSong(4, '', ''); redraw(); toast(`Could not read ${f.name}. Protected (Apple Music) or unsupported file.`, 5000); return; }
+  finishSong(); toast(`Added${A.song.bpmAuto ? ` · ${A.song.bpm} BPM` : ''}`);
 }
 async function runSplit(f: File) {
-  await A.ensure(); splitting = true; $('splitRun').hidden = false; ($('splitPick') as HTMLButtonElement).disabled = true;
-  const fill = $('splitBar').querySelector<HTMLElement>('.fill')!, st = $('splitStatus');
+  await A.ensure(); splitting = base(f); $('addAsk').hidden = true; $('splitRun').hidden = false; $('splitName').textContent = splitting;
+  const fill = $('splitBar').querySelector<HTMLElement>('.fill')!, st = $('splitStatus'); fill.style.transform = 'scaleX(0)'; st.textContent = '';
   newSong(6, base(f)); keepAwake(); redraw();
   const id = A.song.id;
   try {
     const r = await Split.splitFile(f, id, p => {
       if (p.stage === 'decode') { fill.style.transform = 'scaleX(.02)'; st.textContent = 'Reading the song…'; }
-      if (p.stage === 'model') { fill.style.transform = `scaleX(${(p.done / p.total).toFixed(4)})`; st.textContent = `Downloading the model: ${Math.round(p.done / 1e6)} of ${Math.round(p.total / 1e6)} MB`; }
+      if (p.stage === 'model') { fill.style.transform = `scaleX(${(p.done / p.total).toFixed(4)})`; st.textContent = `Downloading the splitter: ${Math.round(p.done / 1e6)} of ${Math.round(p.total / 1e6)} MB`; }
       if (p.stage === 'load') { fill.style.transform = 'scaleX(1)'; st.textContent = 'Starting the splitter…'; }
       if (p.stage === 'split') { fill.style.transform = `scaleX(${(p.done / p.total).toFixed(4)})`; st.textContent = `Splitting: ${Math.round(p.done / p.total * 100)}%` + (p.eta !== undefined ? ` · about ${mmss(p.eta)} left` : '') + (p.ep === 'wasm' ? ' (no GPU: slower)' : ''); }
     });
     if (A.song.id !== id) return;
-    A.song.sr = 44100; A.song.title = base(f); source = 'split';
-    r.stems.forEach((o, i) => { const slot = Split.SLOTS[i]; A.song.stems[slot].meta = { name: Split.SOURCES[i], n: o.n, ch: o.ch, dur: o.dur, peaks: o.peaks, ms: o.ms, offset: 0, file: f.name }; A.song.stems[slot].name = Split.SOURCES[i]; });
+    // keep the parts that have something in them (a song with no guitar gets no Guitar fader), side by side
+    const top = Math.max(...r.stems.map(o => o.ms)), keep = r.stems.map((o, i) => ({ o, i })).filter(x => x.o.ms > top * 1e-4);
+    for (const i of r.stems.map((_, j) => j).filter(i => !keep.some(k => k.i === i))) await Store.deleteStem(id, Split.SLOTS[i]);
+    newSong(keep.length, base(f), id); A.song.sr = 44100; source = 'split';
+    keep.forEach(({ o, i }, c) => { A.song.stems[c].meta = { name: Split.SOURCES[i], n: o.n, ch: o.ch, dur: o.dur, peaks: o.peaks, ms: o.ms, offset: 0, file: f.name, dir: Split.SLOTS[i] }; A.song.stems[c].name = Split.SOURCES[i]; });
     onsetsBy.set(0, { on: r.stems[0].onsets, hop: r.stems[0].hop });
-    finishSong(); closeSheets(); toast(`Split in ${mmss(r.secs)}${A.song.bpmAuto ? ` · ${A.song.bpm} BPM` : ''}`, 4000);
+    finishSong(); closeSheets(); go(); toast(`Split into ${keep.length} parts in ${mmss(r.secs)}${A.song.bpmAuto ? ` · ${A.song.bpm} BPM` : ''}`, 4000);
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
     await Store.deleteSong(id); if (A.song.id === id) newSong(4, '', '');
     redraw(); toast(msg === 'cancelled' ? 'Split cancelled' : 'Could not split: ' + msg, 5000);
-  } finally { splitting = false; $('splitRun').hidden = true; ($('splitPick') as HTMLButtonElement).disabled = false; letSleep(); }
+  } finally { splitting = ''; $('splitRun').hidden = true; letSleep(); if (!$('libSheet').hidden) openLibrary(); }
 }
-control($('splitBtn'), { undoable: false, up: openSplit });
-$('splitPick').addEventListener('click', () => ($('splitFile') as HTMLInputElement).click());
-$('splitFile').addEventListener('change', e => { const i = e.target as HTMLInputElement; const f = i.files?.[0]; i.value = ''; if (f) runSplit(f); });
+$('addSong').addEventListener('click', () => { A.ensure(); ($('addFile') as HTMLInputElement).click(); });
+$('addFile').addEventListener('change', e => { const i = e.target as HTMLInputElement, f = i.files?.[0]; i.value = ''; if (f) askAdd(f); });
+$('addParts').addEventListener('click', async () => { await A.ensure(); go(); newSong(4, 'New song'); redraw(); slotsDraw(); closeSheets(); openSheet('songSheet'); });
+$('addSplit').addEventListener('click', () => { const f = addPending; addPending = null; if (f && !splitting) runSplit(f); });
+$('addKeep').addEventListener('click', () => { const f = addPending; addPending = null; if (f) keepWhole(f); });
 $('splitCancel').addEventListener('click', () => Split.cancelSplit());
 
 // ---------- library ----------
@@ -562,24 +576,35 @@ const confirmTap = (key: string, btn: HTMLElement, label: string) => { const n =
   armed.set(key, n + 3000); btn.classList.add('warn'); btn.textContent = 'Sure?'; setTimeout(() => { btn.classList.remove('warn'); btn.textContent = label; }, 3000); return false; };
 async function openLibrary() {
   closeSheets(); openSheet('libSheet');
-  const [songs, use] = await Promise.all([Store.listSongs(), Store.storageUse()]);
+  const [all, use] = await Promise.all([Store.listSongs(), Store.storageUse()]);
+  const songs = all.filter(m => m.id !== DEMO.id), demo = all.find(m => m.id === DEMO.id);
   $('libStore').textContent = `${songs.length} song${songs.length === 1 ? '' : 's'} · ${mb(use.used)} used` + (use.persisted ? ' · kept safe on this phone' : standalone ? '' : ' · add to your Home Screen so Safari keeps them');
-  $('libSongs').innerHTML = songs.length ? songs.map(m => { const st = m.stems.filter(Boolean) as Store.StemMeta[], d = Math.max(0, ...st.map(x => x.dur));
-    return `<div class="lib-item" data-id="${m.id}"><div class="t">${esc(m.title || 'Untitled')}${m.id === A.song.id ? '<small>OPEN</small>' : ''}</div>
-      <div class="s">${st.length} parts · ${fmt(d)} · ${m.bpm} BPM · ${m.source === 'split' ? 'split' : m.source === 'demo' ? 'demo' : 'files'} · ${day(m.played || m.created)}</div>
-      <div class="b"><button class="go1" data-act="open">Open</button><button data-act="export">Export</button><button data-act="del">Delete</button></div></div>`; }).join('')
-    : '<p class="note">No songs yet. Load tracks or split a song and it will be kept here.</p>';
+  const item = (id: string, title: string, sub: string, more: boolean) => `<div class="lib-item" data-id="${id}"><div class="t">${esc(title)}${id === A.song.id ? '<small>OPEN</small>' : ''}</div>
+      <div class="s">${sub}</div>
+      <div class="b"><button class="go1" data-act="open">Open</button>${more ? '<button class="more" data-act="more" aria-label="More">⋯</button>' : ''}</div>
+      ${more ? '<div class="b extra" hidden><button data-act="export">Export</button><button data-act="rename">Rename</button><button data-act="del">Delete</button></div>' : ''}</div>`;
+  const sub = (m: Store.SongMeta) => { const st = m.stems.filter(Boolean) as Store.StemMeta[], d = Math.max(0, ...st.map(x => x.dur));
+    return `${st.length === 1 ? 'one track' : st.length + ' parts'} · ${fmt(d)} · ${m.bpm} BPM · ${day(m.played || m.created)}`; };
+  $('libSongs').innerHTML = (splitting ? `<div class="lib-item busy"><div class="t">${esc(splitting)}</div><div class="s">Splitting… <button class="link" id="libSplitView">Show</button></div></div>` : '')
+    + item(DEMO.id, DEMO.title, demo ? sub(demo) : `${DEMO.parts.length} parts · ${DEMO.bpm} BPM · free demo, downloads when opened`, false)
+    + songs.map(m => item(m.id, m.title || 'Untitled', sub(m), true)).join('')
+    + (songs.length ? '' : '<p class="note">Add a song and it will be kept here.</p>');
+  document.getElementById('libSplitView')?.addEventListener('click', () => { closeSheets(); openSheet('addSheet'); $('addAsk').hidden = true; $('splitRun').hidden = false; });
   $('libSongs').querySelectorAll<HTMLElement>('[data-act]').forEach(b => b.addEventListener('click', async () => {
-    const id = b.closest<HTMLElement>('.lib-item')!.dataset.id!, m = songs.find(x => x.id === id)!;
-    if (b.dataset.act === 'open') { closeSheets(); await openSong(m); return; }
-    if (b.dataset.act === 'export') { b.textContent = '…'; try { const z = await Store.exportSong(id === A.song.id ? songMeta() : m); await shareBlob(z, `${fileSafe(m.title)}.dubstudio.zip`); } catch (e) { toast('Could not export: ' + (e as Error).message); } b.textContent = 'Export'; return; }
-    if (b.dataset.act === 'del' && confirmTap('song' + id, b, 'Delete')) { if (id === A.song.id) newSong(4, '', ''); await Store.deleteSong(id); redraw(); openLibrary(); }
+    const box = b.closest<HTMLElement>('.lib-item')!, id = box.dataset.id!, m = all.find(x => x.id === id);
+    const act = b.dataset.act;
+    if (act === 'open') { await A.ensure(); closeSheets(); go(); if (id === DEMO.id) await loadDemo(); else if (m) await openSong(m); if (!A.playing && A.dur()) playToggle(); return; }
+    if (act === 'more') { const x = box.querySelector<HTMLElement>('.extra')!; x.hidden = !x.hidden; return; }
+    if (!m) return;
+    if (act === 'export') { b.textContent = '…'; try { const z = await Store.exportSong(id === A.song.id ? songMeta() : m); await shareBlob(z, `${fileSafe(m.title)}.dubstudio.zip`); } catch (e) { toast('Could not export: ' + (e as Error).message); } b.textContent = 'Export'; return; }
+    if (act === 'rename') { const t = prompt('Song title', m.title)?.trim().slice(0, 60); if (!t) return;
+      if (id === A.song.id) { A.song.title = t; saveSong(); redraw(); media(); } else { m.title = t; await Store.saveMeta(m); } openLibrary(); return; }
+    if (act === 'del' && confirmTap('song' + id, b, 'Delete')) { if (id === A.song.id) newSong(4, '', ''); await Store.deleteSong(id); redraw(); openLibrary(); }
   }));
   const takes = A.song.id ? await Store.listTakes(A.song.id) : [];
-  $('libTakesH').textContent = A.song.id ? `Takes of ${A.song.title || 'this song'}` : 'Takes';
-  $('libTakes').innerHTML = takes.length ? takes.map((t, i) => `<div class="lib-item" data-t="${i}"><div class="s">Take ${takes.length - i} · ${mb(t.size)} · ${day(t.when)} ${new Date(t.when).toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' })}</div>
-      <div class="b"><button class="go1" data-tact="play">Play</button><button data-tact="share">Share</button><button data-tact="del">Delete</button></div></div>`).join('')
-    : '<p class="note">Press Rec on the mixer to record a take of this song.</p>';
+  $('libTakesH').hidden = !takes.length; $('libTakesH').textContent = `Takes of ${A.song.title || 'this song'}`;
+  $('libTakes').innerHTML = takes.map((t, i) => `<div class="lib-item" data-t="${i}"><div class="s">Take ${takes.length - i} · ${mb(t.size)} · ${day(t.when)} ${new Date(t.when).toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' })}</div>
+      <div class="b"><button class="go1" data-tact="play">Play</button><button data-tact="share">Share</button><button data-tact="del">Delete</button></div></div>`).join('');
   $('libTakes').querySelectorAll<HTMLElement>('[data-tact]').forEach(b => b.addEventListener('click', async () => {
     const box = b.closest<HTMLElement>('.lib-item')!, t = takes[+box.dataset.t!], f = await Store.takeFile(t); if (!f) return;
     if (b.dataset.tact === 'play') { box.querySelector('audio')?.remove(); const a = document.createElement('audio'); a.controls = true; a.setAttribute('playsinline', ''); a.src = URL.createObjectURL(f); box.appendChild(a); a.play().catch(() => {}); }
@@ -615,8 +640,7 @@ async function refreshContinue() {
   if (cur) { contSong = null; b.hidden = false; b.querySelector('span')!.textContent = A.song.title || 'Untitled'; }
   else { let last = ''; try { last = localStorage.getItem('dub-studio-last') || ''; } catch { /* */ }
     contSong = last ? await Store.loadMeta(last) : null; b.hidden = !contSong; if (contSong) b.querySelector('span')!.textContent = contSong.title || 'Untitled'; }
-  $('goDemo').classList.toggle('alt', !$('goLast').hidden);   // with a song to go back to, Continue is the main button
-  Store.listSongs().then(l => { $('goLib').hidden = !l.length; });
+  $('goLib').classList.toggle('alt', !$('goLast').hidden);   // with a song to go back to, Continue is the main button
 }
 $('goLast').addEventListener('click', async () => { A.ensure(); go(); if (contSong) { const m = contSong; contSong = null; await openSong(m); playToggle(); } });
 refreshContinue();
@@ -625,12 +649,9 @@ function showMenu() { closeSheets(); pages.forEach(x => { $(x).hidden = true; })
 document.querySelectorAll<HTMLElement>('.brand').forEach(b => { b.setAttribute('role', 'button'); b.setAttribute('aria-label', 'Main menu'); control(b, { undoable: false, up: () => { tick(); showMenu(); } }); });
 const standalone = matchMedia('(display-mode: standalone)').matches || (navigator as Navigator & { standalone?: boolean }).standalone;
 if (/iPhone|iPad|iPod/.test(navigator.userAgent) && !standalone) $('install').hidden = false;
-const go = () => { $('start').hidden = true; requestAnimationFrame(redraw); firstTour(); };
-$('goDemo').addEventListener('click', async () => { A.ensure(); go(); await loadDemo(); playToggle(); });
-$('goLoad').addEventListener('click', () => { A.ensure(); ($('startFiles') as HTMLInputElement).click(); });
-$('goSplit').addEventListener('click', () => { A.ensure(); go(); openSplit(); });
+const go = () => { $('start').hidden = true; requestAnimationFrame(redraw); };
 $('goLib').addEventListener('click', () => { A.ensure(); go(); openLibrary(); });
-$('startFiles').addEventListener('change', e => { const i = e.target as HTMLInputElement; const fs = [...(i.files || [])]; i.value = ''; if (fs.length) { go(); loadMany(fs); } });
+$('goHelp').addEventListener('click', () => { A.ensure(); go(); tour.open(MIXER_TOUR); });
 if (navigator.storage?.persist) navigator.storage.persisted().then(p => { if (!p && standalone) navigator.storage.persist(); }).catch(() => {});
 
 function fit() { const big = innerWidth >= 700 && innerHeight >= 700, z = big ? Math.max(1, Math.min(1.6, innerHeight / 820, innerWidth / 480)) : 1; document.documentElement.style.setProperty('--z', z.toFixed(3)); requestAnimationFrame(redraw); }

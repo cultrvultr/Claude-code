@@ -176,7 +176,7 @@ function want(i: number, k: number) {
   const id = key(i, k), sid = song.id; if (cache.has(id) || pend.has(id) || !ctx) return;
   pend.add(id);
   const ch = song.stems[i].meta?.ch || 1;
-  readPieceFloat(sid, i, k, ch).then(chans => {   // read and converted in a worker; here only a fast copy
+  const m = song.stems[i].meta; readPieceFloat(sid, m && m.dir !== undefined ? m.dir : i, k, ch).then(chans => {   // read and converted in a worker; here only a fast copy
     pend.delete(id); if (!chans || !ctx || sid !== song.id) return;
     const b = ctx.createBuffer(ch, chans[0].length, song.sr); chans.forEach((d, c) => b.copyToChannel(d as Float32Array<ArrayBuffer>, c));
     cache.set(id, b);

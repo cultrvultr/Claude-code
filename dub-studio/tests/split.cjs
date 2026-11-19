@@ -24,9 +24,10 @@ const mix = wav(9, t => {
   const p = await (await b.newContext({ ...devices['iPhone 15'] })).newPage();
   const errs = []; p.on('pageerror', e => errs.push(e.message)); p.on('console', m => { if (m.type() === 'error') errs.push(m.text()); });
   await p.addInitScript(() => localStorage.setItem('dub-studio-toured', '1'));
-  await p.goto(URL); await p.tap('#goSplit'); await p.waitForTimeout(500);
-  const t0 = Date.now();
-  await p.setInputFiles('#splitFile', { name: 'Test riddim.wav', mimeType: 'audio/wav', buffer: mix });
+  await p.goto(URL); await p.tap('#goLib'); await p.waitForTimeout(500);
+  await p.setInputFiles('#addFile', { name: 'Test riddim.wav', mimeType: 'audio/wav', buffer: mix });
+  await p.waitForSelector('#addSheet:not([hidden])'); if ((await p.textContent('#addName')) !== 'Test riddim') fail('add sheet name');
+  const t0 = Date.now(); await p.click('#addSplit');
   let last = '';
   for (;;) {
     await p.waitForTimeout(3000);
@@ -37,10 +38,11 @@ const mix = wav(9, t => {
   }
   console.log('  toast:', await p.textContent('#toast'));
   const slots = await p.$$eval('.st:not([hidden]):not(.off) .slot', e => e.map(x => x.textContent));
-  if (slots.join(',') !== 'Drums,Bass,Other,Vocals') fail('visible slots ' + slots.join(','));   // bank 1 of 6
+  console.log('  visible parts:', slots.join(','));
+  if (!slots.join(',').startsWith('Drums,Bass')) fail('visible slots ' + slots.join(','));
   await p.tap('#songBtn');
   const rows = await p.$$eval('.slotrow > span', e => e.map(x => x.textContent));
-  if (rows.length !== 6 || rows.some(r => !r.startsWith('0:09'))) fail('rows ' + rows.join(' | '));
+  if (rows.length < 2 || rows.length > 6 || rows.some(r => !r.startsWith('0:09'))) fail('rows ' + rows.join(' | '));
   const energy = await p.$$eval('.slotrow .wave path', e => e.map(x => (x.getAttribute('d').match(/V/g) || []).length && x.getAttribute('d').length));
   console.log('  waveform sizes', energy.join(' '));
   await p.click('#songSheet [data-x]');

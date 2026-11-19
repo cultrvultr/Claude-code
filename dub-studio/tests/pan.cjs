@@ -1,4 +1,5 @@
 // Stereo spread places the demo's parts by name; Pan sliders move them; the switch puts them back in the middle.
+const { openDemo, loadParts } = require('./helpers.cjs');
 // The logo opens the main menu; Continue goes back to the same song without reloading it.
 const { chromium, devices } = require('playwright');
 const URL = process.env.URL || 'http://localhost:4173/';
@@ -8,7 +9,7 @@ const fail = m => { console.error('FAIL', m); process.exitCode = 1; };
   const p = await (await b.newContext({ ...devices['iPhone 15'] })).newPage();
   const errs = []; p.on('pageerror', e => errs.push(e.message)); p.on('console', m => { if (m.type() === 'error') errs.push(m.text()); });
   await p.addInitScript(() => localStorage.setItem('dub-studio-toured', '1'));
-  await p.goto(URL); await p.tap('#goDemo');
+  await p.goto(URL); await openDemo(p);
   await p.waitForFunction(() => /BPM/.test(document.getElementById('toast').textContent), null, { timeout: 60000 }); await p.waitForTimeout(400);
   const pans = () => p.evaluate(() => [0, 1, 2, 3, 4, 5].map(i => Math.round(window.__dub.pan(i) * 100)));
   const got = await pans(); console.log('  demo pans (Drums Bass Other Vocals Guitar Keys):', got.join(' '));

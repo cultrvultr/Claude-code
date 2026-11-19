@@ -126,11 +126,8 @@
     <div class="lfds" aria-hidden="true"><div class="lfd"><i><b style="top:12%"></b></i></div><div class="lfd"><i><b style="top:30%"></b></i></div><div class="lfd"><i><b style="top:64%"></b></i></div><div class="lfd"><i><b style="top:20%"></b></i></div></div>
     <p class="sub">4 to 8 tracks. Faders, filters, tape echo, spring verb, siren.</p>
     <button id="goLast" class="go" hidden>Continue <span></span></button>
-    <button id="goDemo" class="go">Play the demo</button>
-    <button id="goLoad" class="go alt">Load your tracks</button>
-    <button id="goSplit" class="go alt">Split a song into parts</button>
-    <button id="goLib" class="go alt" hidden>Library</button>
-    <input type="file" id="startFiles" accept="audio/*,.mp3,.m4a,.wav,.aif,.aiff,.flac,.ogg" multiple hidden>
+    <button id="goLib" class="go">Library</button>
+    <button id="goHelp" class="go alt">How to play</button>
     <p class="install" id="install" hidden>Add to your Home Screen to keep your songs: tap <b>Share</b>, then <b>Add to Home Screen</b>.</p>
   </div>
 </div>
@@ -143,37 +140,36 @@
   <p class="note" id="bpmNote"></p>
   <label class="spread"><input type="checkbox" id="fSpread" checked><span>Stereo spread<small>Places each part left or right by its name. Fine-tune with Pan below.</small></span></label>
   <div id="slots"></div>
-  <button class="wide" id="loadAll">Load 4 to 8 files at once</button>
-  <button class="wide" id="splitBtn">Split a full song into parts</button>
-  <button class="wide alt" id="loadDemo">Load the demo song</button>
-  <p class="note">Songs bought or streamed in Apple Music are copy protected and can't be loaded. Use files from the Files app, AirDrop or Voice Memos.</p>
-  <input type="file" id="oneFile" accept="audio/*,.mp3,.m4a,.wav,.aif,.aiff,.flac,.ogg" hidden>
-  <input type="file" id="allFiles" accept="audio/*,.mp3,.m4a,.wav,.aif,.aiff,.flac,.ogg" multiple hidden>
+  <p class="note">Already have the parts as separate files? Tap Load on each track, and + Add track for more (up to 8).</p>
 </div></div>
 
-<div class="sheetbg" id="splitSheet" hidden><div class="sheet scroll">
-  <div class="shtop"><h2>Split a song</h2><button class="x" data-x aria-label="Close">&times;</button></div>
-  <p>Pick a full mix. It is split on this phone into six parts: <b>Drums, Bass, Other, Vocals, Guitar</b> and <b>Keys</b>, ready to dub.</p>
-  <p class="note" id="splitModel"></p>
-  <button class="wide" id="splitPick">Choose a song</button>
+<div class="sheetbg" id="addSheet" hidden><div class="sheet scroll">
+  <div class="shtop"><h2>Add a song</h2><button class="x" data-x aria-label="Close">&times;</button></div>
+  <div id="addAsk">
+    <p class="addq">Split <b id="addName"></b> into parts?</p>
+    <button class="choice" id="addSplit"><b>Split into parts</b><span>Drums, bass, vocals and more, each on its own fader. Takes 1–3 minutes.</span><span id="splitModel"></span></button>
+    <button class="choice alt" id="addKeep"><b>Keep as one track</b><span>Ready right away, as one stereo channel. Echo, verb, cut and the siren still work.</span></button>
+  </div>
   <div class="splitrun" id="splitRun" hidden>
+    <p class="addq">Splitting <b id="splitName"></b></p>
     <div class="bar" id="splitBar"><div class="fill"></div></div>
     <p class="splitstat" id="splitStatus"></p>
-    <p class="note">Keep Dub Studio open and the screen on. A 4-minute song takes a few minutes on a recent iPhone.</p>
+    <p class="note">Keep Dub Studio open and the screen on.</p>
     <button class="wide alt" id="splitCancel">Cancel</button>
   </div>
-  <p class="note">Separation by htdemucs_6s (Meta's Demucs, MIT licence). It is very good, not perfect: some bleed between parts is normal.</p>
-  <input type="file" id="splitFile" accept="audio/*,.mp3,.m4a,.wav,.aif,.aiff,.flac,.ogg" hidden>
+  <p class="note">Separation by htdemucs_6s (Meta's Demucs, MIT licence): very good, not perfect, so some bleed between parts is normal.</p>
 </div></div>
 
 <div class="sheetbg" id="libSheet" hidden><div class="sheet scroll">
   <div class="shtop"><h2>Library</h2><button class="x" data-x aria-label="Close">&times;</button></div>
+  <button class="wide" id="addSong">+ Add song</button>
+  <p class="note">One song file (MP3, M4A, WAV…) from Files, AirDrop or Voice Memos. Songs from Apple Music are copy protected and can't be added. Already split into parts? <button class="link" id="addParts">Build a song from parts</button>.</p>
+  <input type="file" id="addFile" accept="audio/*,.mp3,.m4a,.wav,.aif,.aiff,.flac,.ogg" hidden>
   <p class="note" id="libStore"></p>
   <div id="libSongs"></div>
   <h3 class="libh" id="libTakesH">Takes</h3>
   <div id="libTakes"></div>
-  <button class="wide alt" id="libImport">Import a song (.zip)</button>
-  <p class="note">Export makes one .zip with every part, your mix and A–D: AirDrop it to another phone and Import it there.</p>
+  <p class="note libimport">Got a song from a friend? <button class="link" id="libImport">Import a song file (.zip)</button>. Export one from its ⋯ menu.</p>
   <input type="file" id="importFile" accept=".zip,application/zip" hidden>
 </div></div>
 
@@ -203,10 +199,9 @@
     <dt>Rec</dt><dd>Records what you hear. Share or save it when you stop.</dd>
     <dt>Pan, Stereo spread</dt><dd>Songs open in stereo: each part is placed left or right by its name (drums, bass and vocals stay in the middle). Turn Stereo spread off in the Song sheet for mono, or move any part with its Pan slider.</dd>
     <dt>Nudge</dt><dd>In the Song sheet, each track has a Nudge in milliseconds to line up parts that were exported a little early or late.</dd>
-    <dt>Split</dt><dd>No stems? Split a full song into Drums, Bass, Other, Vocals, Guitar and Keys right on the phone (Song sheet or start screen). The first time downloads the 285 MB model: use Wi-Fi.</dd>
-    <dt>Library</dt><dd>Every song you load or split is kept on the phone with its own mix, A–D and takes. Open it from the Song sheet. Share any part as a WAV, or export the whole song to move it to another device.</dd>
-    <dt>Main menu</dt><dd>Tap the Dub Studio logo for the main menu: continue the song you are on, play the demo, load or split a song, or open the Library.</dd>
-    <dt>Song</dt><dd>Tap the title to load your tracks (4 to 8: break out vocals, guitar, keys…), rename them and set the tempo. With more than 4, swipe sideways across the strips to switch between channels 1–4 and 5–8 (or tap 1–4 / 5–8 above them).</dd>
+        <dt>Library</dt><dd>All your songs, the demo first. Tap + Add song and pick one song file: the app asks whether to split it into parts (drums, bass, vocals…) or keep it as one track. Each song keeps its own mix, A–D and takes. The ⋯ next to a song exports, renames or deletes it.</dd>
+    <dt>Main menu</dt><dd>Tap the Dub Studio logo for the main menu: continue the song you are on, or open the Library.</dd>
+    <dt>Song</dt><dd>Tap the song title for its settings: title, tempo, stereo spread, and each part's name, pan, nudge and WAV. With more than 4 parts, swipe sideways across the strips to switch between 1–4 and 5–8.</dd>
     <dt>No sound</dt><dd>Volume up. Bluetooth headphones add delay to the pads: use wired or the speaker to play live.</dd>
   </dl>
   <div class="credit">
@@ -216,6 +211,8 @@
   </div>
 </div></div>
 
+<input type="file" id="oneFile" accept="audio/*,.mp3,.m4a,.wav,.aif,.aiff,.flac,.ogg" hidden>
+<input type="file" id="partsFiles" accept="audio/*,.mp3,.m4a,.wav,.aif,.aiff,.flac,.ogg" multiple hidden aria-hidden="true">
 <div id="toast" role="status" hidden></div>
 <div id="turn" role="status"><p>Turn your phone upright</p></div>
 <script type="module" src="/src/main.ts"></script>

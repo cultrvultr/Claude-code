@@ -7,7 +7,9 @@ import { makeZip, readZip, wavHeader } from '../library/zip';
 
 export const SEG = 10;   // seconds per piece
 
-export interface StemMeta { name: string; n: number; ch: number; dur: number; peaks: number[]; ms: number; offset: number; file?: string }
+// dir: the stored folder s<dir> of its pieces, when it is not the part's own position (a split with silent parts dropped)
+export interface StemMeta { name: string; n: number; ch: number; dur: number; peaks: number[]; ms: number; offset: number; file?: string; dir?: number }
+export const dirOf = (st: StemMeta, i: number) => st.dir ?? i;
 export interface SongMeta { id: string; title: string; bpm: number; bpmAuto?: boolean; sr: number; seg: number; gain: number; stems: (StemMeta | null)[]; cues: number[]; created: number; played?: number;
   mix?: unknown; snaps?: (string | null)[]; source?: 'files' | 'split' | 'demo'; spread?: boolean }
 
@@ -62,7 +64,8 @@ export function cleanMeta(raw: unknown): SongMeta | null {
   const stems = m.stems.slice(0, 8).map((x): StemMeta | null => {
     if (!x || typeof x !== 'object') return null; const t = x as Record<string, unknown>;
     return { name: str(t.name, 24) || 'Track', n: Math.round(num(t.n, 0, 4000, 0)), ch: t.ch === 2 ? 2 : 1, dur: num(t.dur, 0, 36000, 0),
-      peaks: Array.isArray(t.peaks) ? t.peaks.slice(0, 400).map(v => num(v, 0, 1, 0)) : [], ms: num(t.ms, 0, 10, 0), offset: Math.round(num(t.offset, -2000, 2000, 0)), file: str(t.file, 200) || undefined };
+      peaks: Array.isArray(t.peaks) ? t.peaks.slice(0, 400).map(v => num(v, 0, 1, 0)) : [], ms: num(t.ms, 0, 10, 0), offset: Math.round(num(t.offset, -2000, 2000, 0)), file: str(t.file, 200) || undefined,
+      dir: t.dir === undefined ? undefined : Math.round(num(t.dir, 0, 7, 0)) };
   });
   return { id: m.id, title: str(m.title, 80), bpm: num(m.bpm, 40, 220, 75), bpmAuto: m.bpmAuto === true, sr: Math.round(num(m.sr, 8000, 192000, 48000)), seg: SEG,
     gain: num(m.gain, 0.05, 8, 1), stems, cues: Array.isArray(m.cues) ? m.cues.slice(0, 12).map(v => num(v, 0, 36000, 0)) : [],
@@ -90,6 +93,7 @@ export async function listSongs(): Promise<SongMeta[]> {
   } catch { /* no OPFS */ }
   return out.sort((a, b) => (b.played || b.created) - (a.played || a.created));
 }
+export async function deleteStem(id: string, dir: number) { mem.delete(`${id}/${dir}`); await remove(['songs', id, 's' + dir]); }
 export async function deleteSong(id: string) {
   for (const k of [...mem.keys()]) if (k.startsWith(id + '/')) mem.delete(k);
   try { localStorage.removeItem('dub-studio-meta-' + id); } catch { /* */ }
@@ -104,7 +108,7 @@ async function pieceBlob(id: string, stem: number, k: number): Promise<Blob | nu
 export async function stemWav(meta: SongMeta, stem: number): Promise<Blob> {
   const st = meta.stems[stem]; if (!st) throw new Error('empty track');
   const parts: Blob[] = []; let bytes = 0;
-  for (let k = 0; k < st.n; k++) { const b = await pieceBlob(meta.id, stem, k); if (!b) throw new Error('missing audio'); parts.push(b); bytes += b.size; }
+  for (let k = 0; k < st.n; k++) { const b = await pieceBlob(meta.id, dirOf(st, stem), k); if (!b) throw new Error('missing audio'); parts.push(b); bytes += b.size; }
   return new Blob([wavHeader(bytes / (2 * st.ch), st.ch, meta.sr), ...parts], { type: 'audio/wav' });
 }
 
@@ -112,7 +116,7 @@ export async function stemWav(meta: SongMeta, stem: number): Promise<Blob> {
 export async function exportSong(meta: SongMeta, onFile?: (i: number, n: number) => void): Promise<Blob> {
   const entries: { name: string; data: Blob }[] = [{ name: 'meta.json', data: new Blob([JSON.stringify(meta)]) }];
   for (let i = 0; i < meta.stems.length; i++) { const st = meta.stems[i]; if (!st) continue;
-    for (let k = 0; k < st.n; k++) { const b = await pieceBlob(meta.id, i, k); if (!b) throw new Error('missing audio'); entries.push({ name: `s${i}/${k}.pcm`, data: b }); } }
+    const d = dirOf(st, i); for (let k = 0; k < st.n; k++) { const b = await pieceBlob(meta.id, d, k); if (!b) throw new Error('missing audio'); entries.push({ name: `s${d}/${k}.pcm`, data: b }); } }
   return makeZip(entries, i => onFile?.(i, entries.length));
 }
 export async function importSong(zip: Blob, onFile?: (i: number, n: number) => void): Promise<SongMeta> {
@@ -127,7 +131,8 @@ export async function importSong(zip: Blob, onFile?: (i: number, n: number) => v
   let i = 0;
   for (const f of files) {
     const m = /^s([0-7])\/(\d{1,4})\.pcm$/.exec(f.name);   // nothing but s<stem>/<k>.pcm is ever written
-    if (m && meta.stems[+m[1]] && +m[2] < meta.stems[+m[1]]!.n && f.data.size <= PIECE_MAX && f.data.size % 2 === 0) await writeAt(['songs', meta.id, 's' + m[1], m[2] + '.pcm'], f.data);
+    const st = m ? meta.stems.find((x, i) => x && dirOf(x, i) === +m[1]) : null;
+    if (m && st && +m[2] < st.n && f.data.size <= PIECE_MAX && f.data.size % 2 === 0) await writeAt(['songs', meta.id, 's' + m[1], m[2] + '.pcm'], f.data);
     onFile?.(++i, files.length);
   }
   await saveMeta(meta); return meta;

@@ -1,4 +1,5 @@
 // Track loader: 3 files (drum clicks at 92 BPM, a mono bass saved as stereo, true-stereo keys), 25 s each.
+const { openDemo, loadParts } = require('./helpers.cjs');
 // Checks tempo detection, mono detection, waveforms, playing across a piece boundary, the end, loop wrap, cues,
 // and opening the song again from storage after a reload.
 const { chromium, devices } = require('playwright');
@@ -23,7 +24,7 @@ const files = [
   const errs = []; p.on('pageerror', e => errs.push(e.message)); p.on('console', m => { if (m.type() === 'error') errs.push(m.text()); });
   await p.addInitScript(() => localStorage.setItem('dub-studio-toured', '1'));
   await p.goto(URL);
-  await p.setInputFiles('#startFiles', files.map(f => ({ ...f, mimeType: 'audio/wav' })));
+  await loadParts(p, files.map(f => ({ ...f, mimeType: 'audio/wav' })));
   await p.waitForFunction(() => /BPM/.test(document.getElementById('toast').textContent), null, { timeout: 30000 });
   const bpm = +(await p.textContent('#bpm'));
   if (Math.abs(bpm - 92) > 1.5) fail('tempo found ' + bpm + ', expected 92');

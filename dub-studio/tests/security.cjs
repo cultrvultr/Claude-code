@@ -32,9 +32,7 @@ fs.writeFileSync(file, zip([['meta.json', Buffer.from(JSON.stringify(meta))], ['
   const b = await chromium.launch({ args: ['--autoplay-policy=no-user-gesture-required'] });
   const p = await (await b.newContext({ ...devices['iPhone 15'] })).newPage();
   await p.addInitScript(() => localStorage.setItem('dub-studio-toured', '1'));
-  await p.goto(URL); await p.tap('#goLoad').catch(() => {}); await p.keyboard.press('Escape').catch(() => {});
-  await p.evaluate(() => { document.getElementById('start').hidden = true; });
-  await p.tap('#songBtn'); await p.click('#libBtn'); await p.waitForTimeout(300);
+  await p.goto(URL); await p.tap('#goLib'); await p.waitForTimeout(300);
   await p.setInputFiles('#importFile', file);
   await p.waitForFunction(() => /Imported|Could not import/.test(document.getElementById('toast').textContent), null, { timeout: 20000 });
   console.log('  ', await p.textContent('#toast'));
