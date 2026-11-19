@@ -19,7 +19,7 @@ Connect this GitHub repo in Cloudflare Pages with:
 - Build command: `npm run build`
 - Output directory: `dist`
 
-`public/_headers` sets COOP/COEP for the stem splitter (Phase 3).
+`public/_headers` sets the security headers (CSP, COOP/COEP, HSTS).
 
 ## What's built
 
@@ -41,9 +41,9 @@ Connect this GitHub repo in Cloudflare Pages with:
 - Tempo found from the drums; one loudness trim for the whole song; per-part Nudge (ms); waveforms.
 
 **Stem splitter (Phase 3)**
-- htdemucs_6s (MIT) in the browser via ONNX Runtime Web: WebGPU, or WebAssembly without a GPU.
-- Six parts: Drums, Bass, Other, Vocals, Guitar, Keys. The 285 MB model downloads once and stays on the device.
-- `scripts/prepare-assets.mjs` fetches the pinned model, checks its SHA-256 and splits it into 20 MB parts at build time.
+- In the cloud: `functions/api/split.ts` (a Cloudflare Pages Function) runs Demucs htdemucs_6s on Replicate. On-device splitting needed ~2.6 GB of memory, more than iPhone Safari allows.
+- Six parts: Drums, Bass, Other, Vocals, Guitar, Keys; parts that come back silent are dropped.
+- Needs two secrets on the Pages project: `REPLICATE_API_TOKEN` and `INVITE_CODE` (people type the invite code once).
 
 **Library (Phase 4)**
 - Every song is kept with its own mix, A–D, cues and takes. Open, export (.zip), import, delete.
@@ -62,7 +62,7 @@ Connect this GitHub repo in Cloudflare Pages with:
 ```bash
 npm run build && npm run preview   # then, in another shell:
 npm run test:e2e                   # smoke, channels, phase1, loader, library, feel
-npm run test:split                 # the splitter end to end (downloads the model; slow on CPU)
+npm run test:split                 # the split flow with a mocked /api/split (LIVE=1 INVITE=… URL=… uses the real one)
 ```
 
 Demo song: "Let the Echo Repeat" by the project's owner, split into six parts with htdemucs_6s and shipped as AAC in `public/demo/`. All DSP and reverbs are written for this project (CC0). Fonts: Shrikhand and Courier Prime (SIL OFL).

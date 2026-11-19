@@ -1,43 +1,65 @@
-// The page side of the splitter: decode the mix at the model's 44.1 kHz, run the worker, collect the six stems.
-import SplitWorker from './split.worker.ts?worker';
-import type { SplitIn, SplitOut } from './split.worker';
-import type { StemOut } from '../loader/writer';
-import { adoptPieces, SEG } from '../loader/store';
+// Stem splitting in the cloud: the song goes to this site's /api/split (Demucs htdemucs_6s on Replicate),
+// the parts come back as MP3s. A phone hasn't the memory to run the model itself.
+export const SOURCES: Record<string, string> = { drums: 'Drums', bass: 'Bass', other: 'Other', vocals: 'Vocals', guitar: 'Guitar', piano: 'Keys' };
+export const ORDER = ['drums', 'bass', 'other', 'vocals', 'guitar', 'piano'];
 
-export const SOURCES = ['Drums', 'Bass', 'Other', 'Vocals', 'Guitar', 'Keys'];   // htdemucs_6s order; piano goes to Keys
-export const SLOTS = [0, 1, 2, 3, 4, 5];
-export const MODEL_MB = 285;
+export interface SplitProgress { stage: 'upload' | 'queue' | 'split' | 'download'; done: number; total: number }
+export class InviteNeeded extends Error {}
+let job: { id: string; cancel: () => void } | null = null;
+let cancelled = false;
 
-export interface SplitProgress { stage: 'decode' | 'model' | 'load' | 'split'; done: number; total: number; ep?: string; eta?: number }
-let current: Worker | null = null;
-
-export async function modelSaved(): Promise<boolean> {
-  try { const d = await (await navigator.storage.getDirectory()).getDirectoryHandle('models'); return (await (await d.getFileHandle('htdemucs6s.onnx')).getFile()).size > 200e6; }
-  catch { return false; }
+const KEY = 'dub-studio-invite';
+export const invite = { get: () => { try { return localStorage.getItem(KEY) || ''; } catch { return ''; } }, set: (v: string) => { try { localStorage.setItem(KEY, v.trim()); } catch { /* */ } } };
+const API = new URL('api/split', location.href).href;
+const head = () => ({ 'x-invite': invite.get() });
+async function answer(r: Response) {
+  if (r.status === 401) throw new InviteNeeded('invite');
+  let j: { error?: string } & Record<string, unknown> = {}; try { j = await r.json(); } catch { /* */ }
+  if (!r.ok) throw new Error(j.error || 'the splitter answered ' + r.status);
+  return j;
 }
 
-export function cancelSplit() { current?.postMessage({ type: 'cancel' } satisfies SplitIn); }
-
-export async function splitFile(file: Blob, songId: string, onProgress: (p: SplitProgress) => void): Promise<{ stems: StemOut[]; ep: string; secs: number }> {
-  onProgress({ stage: 'decode', done: 0, total: 1 });
-  const ab = await file.arrayBuffer();
-  const buf = await new OfflineAudioContext(2, 1, 44100).decodeAudioData(ab);   // decoded straight to 44.1 kHz
-  const left = new Float32Array(buf.getChannelData(0)), right = new Float32Array(buf.numberOfChannels > 1 ? buf.getChannelData(1) : buf.getChannelData(0));
-  const base = new URL('./', location.href).href;
-  return new Promise((ok, no) => {
-    const w = new SplitWorker(); current = w;
-    const stems: StemOut[] = []; let t0 = 0;
-    w.onmessage = (e: MessageEvent<SplitOut>) => {
-      const m = e.data;
-      if (m.type === 'progress') {
-        let eta: number | undefined;
-        if (m.stage === 'split') { if (m.done === 0) t0 = performance.now(); else eta = (performance.now() - t0) / m.done * (m.total - m.done) / 1000; }
-        onProgress({ stage: m.stage, done: m.done, total: m.total, ep: m.ep, eta });
-      } else if (m.type === 'stem') { stems[m.source] = m.out; if (m.out.pieces) adoptPieces(songId, SLOTS[m.source], m.out.pieces); }
-      else if (m.type === 'done') { w.terminate(); current = null; ok({ stems, ep: m.ep, secs: m.secs }); }
-      else { w.terminate(); current = null; no(new Error(m.msg)); }
-    };
-    w.onerror = e => { w.terminate(); current = null; no(new Error(e.message || 'splitter failed')); };
-    w.postMessage({ type: 'run', songId, base, left, right, seg: SEG, slots: SLOTS } satisfies SplitIn, [left.buffer, right.buffer]);
+function upload(file: Blob, onProgress: (p: SplitProgress) => void): Promise<string> {
+  return new Promise((ok, no) => {   // XHR: fetch can't report upload progress
+    const x = new XMLHttpRequest(); x.open('POST', API); x.setRequestHeader('x-invite', invite.get());
+    x.setRequestHeader('content-type', file.type || 'application/octet-stream');
+    x.upload.onprogress = e => onProgress({ stage: 'upload', done: e.loaded, total: e.total || file.size });
+    x.onload = () => answer(new Response(x.responseText || '{}', { status: x.status })).then(j => ok(String(j.id)), no);
+    x.onerror = () => no(new Error('no connection'));
+    x.onabort = () => no(new Error('cancelled'));
+    job = { id: '', cancel: () => x.abort() };
+    x.send(file);
   });
+}
+const wait = (ms: number) => new Promise(r => setTimeout(r, ms));
+
+export function cancelSplit() { cancelled = true; job?.cancel(); }
+
+/** Upload, wait, download. Returns the parts in ORDER that came back. */
+export async function splitFile(file: Blob, onProgress: (p: SplitProgress) => void): Promise<{ name: string; blob: Blob }[]> {
+  if (!invite.get()) throw new InviteNeeded('invite');
+  cancelled = false;
+  try {
+    const id = await upload(file, onProgress);
+    if (cancelled) throw new Error('cancelled');
+    job = { id, cancel: () => { fetch(API + '?id=' + id + '&cancel=1', { method: 'POST', headers: head() }).catch(() => {}); } };
+    const t0 = Date.now(); let stems: string[] = [];
+    for (;;) {
+      if (cancelled) throw new Error('cancelled');
+      const j = await answer(await fetch(API + '?id=' + id, { headers: head(), cache: 'no-store' })) as { status: string; error?: string; stems?: string[] };
+      if (j.status === 'succeeded') { stems = j.stems || []; break; }
+      if (j.status === 'failed' || j.status === 'canceled') throw new Error(j.status === 'canceled' ? 'cancelled' : j.error || 'the split failed');
+      onProgress({ stage: j.status === 'starting' ? 'queue' : 'split', done: (Date.now() - t0) / 1000, total: 0 });
+      await wait(3000);
+    }
+    const names = ORDER.filter(n => stems.includes(n)), out: { name: string; blob: Blob }[] = [];
+    for (let i = 0; i < names.length; i++) {
+      if (cancelled) throw new Error('cancelled');
+      onProgress({ stage: 'download', done: i, total: names.length });
+      const r = await fetch(API + '?id=' + id + '&stem=' + names[i], { headers: head(), cache: 'no-store' });
+      if (!r.ok) await answer(r);
+      out.push({ name: names[i], blob: await r.blob() });
+    }
+    return out;
+  } finally { job = null; }
 }

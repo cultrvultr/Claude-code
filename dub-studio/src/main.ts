@@ -525,8 +525,9 @@ const mmss = (s: number) => s >= 60 ? `${Math.floor(s / 60)} min ${Math.round(s 
 async function askAdd(f: File) {
   addPending = f; $('addName').textContent = base(f); $('addAsk').hidden = false; $('splitRun').hidden = true;
   ($('addSplit') as HTMLButtonElement).disabled = !!splitting;
+  $('inviteBox').hidden = !!Split.invite.get(); ($('inviteCode') as HTMLInputElement).value = '';
+  $('splitModel').textContent = splitting ? 'Another song is splitting. Wait for it to finish.' : '';
   closeSheets(); openSheet('addSheet');
-  $('splitModel').textContent = splitting ? 'Another song is splitting. Wait for it to finish.' : (await Split.modelSaved()) ? '' : `The first split downloads the splitter (${Split.MODEL_MB} MB, once). Use Wi-Fi.`;
 }
 async function keepWhole(f: File) {
   await A.ensure(); go(); closeSheets();
@@ -536,29 +537,38 @@ async function keepWhole(f: File) {
   finishSong(); toast(`Added${A.song.bpmAuto ? ` · ${A.song.bpm} BPM` : ''}`);
 }
 async function runSplit(f: File) {
+  const code = ($('inviteCode') as HTMLInputElement).value.trim(); if (code) Split.invite.set(code);
+  if (!Split.invite.get()) { $('inviteBox').hidden = false; addPending = f; ($('inviteCode') as HTMLInputElement).focus(); toast('Type the invite code first'); return; }
   await A.ensure(); splitting = base(f); $('addAsk').hidden = true; $('splitRun').hidden = false; $('splitName').textContent = splitting;
-  const fill = $('splitBar').querySelector<HTMLElement>('.fill')!, st = $('splitStatus'); fill.style.transform = 'scaleX(0)'; st.textContent = '';
-  newSong(6, base(f)); keepAwake(); redraw();
-  const id = A.song.id;
+  const fill = $('splitBar').querySelector<HTMLElement>('.fill')!, st = $('splitStatus'); fill.style.transform = 'scaleX(0)'; st.textContent = 'Sending the song…';
+  keepAwake(); const t0 = Date.now(); let id = '';
   try {
-    const r = await Split.splitFile(f, id, p => {
-      if (p.stage === 'decode') { fill.style.transform = 'scaleX(.02)'; st.textContent = 'Reading the song…'; }
-      if (p.stage === 'model') { fill.style.transform = `scaleX(${(p.done / p.total).toFixed(4)})`; st.textContent = `Downloading the splitter: ${Math.round(p.done / 1e6)} of ${Math.round(p.total / 1e6)} MB`; }
-      if (p.stage === 'load') { fill.style.transform = 'scaleX(1)'; st.textContent = 'Starting the splitter…'; }
-      if (p.stage === 'split') { fill.style.transform = `scaleX(${(p.done / p.total).toFixed(4)})`; st.textContent = `Splitting: ${Math.round(p.done / p.total * 100)}%` + (p.eta !== undefined ? ` · about ${mmss(p.eta)} left` : '') + (p.ep === 'wasm' ? ' (no GPU: slower)' : ''); }
+    const parts = await Split.splitFile(f, p => {
+      if (p.stage === 'upload') { fill.style.transform = `scaleX(${(0.2 * p.done / p.total).toFixed(4)})`; st.textContent = `Sending the song: ${Math.round(p.done / p.total * 100)}%`; }
+      if (p.stage === 'queue') { fill.style.transform = 'scaleX(.2)'; st.textContent = `Waiting for the splitter… ${mmss(p.done)}`; }
+      if (p.stage === 'split') { fill.style.transform = `scaleX(${(0.2 + 0.6 * Math.min(1, p.done / 90)).toFixed(4)})`; st.textContent = `Splitting… ${mmss(p.done)} (usually under 2 min)`; }
+      if (p.stage === 'download') { fill.style.transform = `scaleX(${(0.8 + 0.2 * p.done / p.total).toFixed(4)})`; st.textContent = `Bringing back the parts: ${p.done + 1} of ${p.total}`; }
     });
-    if (A.song.id !== id) return;
-    // keep the parts that have something in them (a song with no guitar gets no Guitar fader), side by side
-    const top = Math.max(...r.stems.map(o => o.ms)), keep = r.stems.map((o, i) => ({ o, i })).filter(x => x.o.ms > top * 1e-4);
-    for (const i of r.stems.map((_, j) => j).filter(i => !keep.some(k => k.i === i))) await Store.deleteStem(id, Split.SLOTS[i]);
-    newSong(keep.length, base(f), id); A.song.sr = 44100; source = 'split';
-    keep.forEach(({ o, i }, c) => { A.song.stems[c].meta = { name: Split.SOURCES[i], n: o.n, ch: o.ch, dur: o.dur, peaks: o.peaks, ms: o.ms, offset: 0, file: f.name, dir: Split.SLOTS[i] }; A.song.stems[c].name = Split.SOURCES[i]; });
-    onsetsBy.set(0, { on: r.stems[0].onsets, hop: r.stems[0].hop });
-    finishSong(); closeSheets(); go(); toast(`Split into ${keep.length} parts in ${mmss(r.secs)}${A.song.bpmAuto ? ` · ${A.song.bpm} BPM` : ''}`, 4000);
+    // decode each part onto the desk; parts with nothing in them (no guitar in the song) get no fader
+    newSong(parts.length, base(f)); id = A.song.id; source = 'split';
+    parts.forEach((x, i) => { A.song.stems[i].name = Split.SOURCES[x.name]; A.song.stems[i].status = 'Waiting…'; }); closeSheets(); go(); redraw();
+    let c = 0;
+    for (const x of parts) {
+      const nm = Split.SOURCES[x.name];
+      await stemFrom(c, nm, async () => { const b = await A.decodeFile(x.blob); const out: Float32Array[] = []; for (let k = 0; k < Math.min(2, b.numberOfChannels); k++) out.push(new Float32Array(b.getChannelData(k))); return out; }, f.name);
+      const m = A.song.stems[c].meta!;
+      if (m.ms < 1e-5) { await Store.deleteStem(id, Store.dirOf(m, c)); A.song.stems[c].meta = null; onsetsBy.delete(c); }
+      else c++;
+      redraw();
+    }
+    A.song.count = Math.max(1, c); for (let k = c; k < A.N; k++) { A.song.stems[k].meta = null; A.song.stems[k].status = undefined; A.song.stems[k].name = A.DEFAULT_NAMES[k]; }
+    finishSong(); toast(`Split into ${c} parts in ${mmss((Date.now() - t0) / 1000)}${A.song.bpmAuto ? ` · ${A.song.bpm} BPM` : ''}`, 4000);
   } catch (e) {
+    if (e instanceof Superseded) return;
     const msg = e instanceof Error ? e.message : String(e);
-    await Store.deleteSong(id); if (A.song.id === id) newSong(4, '', '');
-    redraw(); toast(msg === 'cancelled' ? 'Split cancelled' : 'Could not split: ' + msg, 5000);
+    if (id) { await Store.deleteSong(id); if (A.song.id === id) newSong(4, '', ''); redraw(); }
+    if (e instanceof Split.InviteNeeded) { Split.invite.set(''); splitting = ''; askAdd(f); toast('That invite code didn\'t work. Check it and try again.', 5000); return; }
+    toast(msg === 'cancelled' ? 'Split cancelled' : 'Could not split: ' + msg, 6000);
   } finally { splitting = ''; $('splitRun').hidden = true; letSleep(); if (!$('libSheet').hidden) openLibrary(); }
 }
 $('addSong').addEventListener('click', () => { A.ensure(); ($('addFile') as HTMLInputElement).click(); });
