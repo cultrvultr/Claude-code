@@ -1,6 +1,6 @@
 {
-  "name": "Pocket Dub Studio",
-  "short_name": "Dub Studio",
+  "name": "Mobile Dub Mixer",
+  "short_name": "Dub Mixer",
   "start_url": "./",
   "scope": "./",
   "display": "standalone",

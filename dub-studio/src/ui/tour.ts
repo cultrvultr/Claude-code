@@ -3,7 +3,7 @@
 export interface Step { el?: string; page?: string; h: string; t: string }
 
 export const MIXER_TOUR: Step[] = [
-  { h: 'Dub Studio', t: 'Your song in up to eight parts on faders. Mix it live like a dub engineer: drop parts out, cut them with the filter, throw them into the echo and the spring.<br><small>Each tip lights a control. Try it while the tip is open.</small>' },
+  { h: 'Dub Mixer', t: 'Your song in up to eight parts on faders. Mix it live like a dub engineer: drop parts out, cut them with the filter, throw them into the echo and the spring.<br><small>Each tip lights a control. Try it while the tip is open.</small>' },
   { el: '.song', h: 'Play', t: 'Start and stop. Tap or drag the line to jump. The title opens the song\'s settings. Your songs live in the Library: tap the logo.' },
   { el: '#loopBtn', h: 'Loop', t: 'Loops four bars from where you are, so you can work on one drop again and again. Tap again to let the song run on.' },
   { el: '#recBtn', h: 'Rec', t: 'Records what you hear, echoes and all. When you stop, share it or save it to Files.' },

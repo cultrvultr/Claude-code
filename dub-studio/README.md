@@ -1,4 +1,4 @@
-# Pocket Dub Studio
+# Mobile Dub Mixer
 
 Dub any four tracks live on your phone: faders, stepped filters, a tape echo, spring reverbs, a siren and a Synare-style drum. Built for a recent iPhone in Safari. See [PLAN.md](PLAN.md).
 

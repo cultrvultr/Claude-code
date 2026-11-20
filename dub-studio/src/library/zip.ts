@@ -40,7 +40,7 @@ export async function readZip(z: Blob): Promise<{ name: string; data: Blob }[]> 
     if (cd.getUint32(p, true) !== 0x02014b50) throw new Error('bad zip directory');
     const method = cd.getUint16(p + 10, true), size = cd.getUint32(p + 20, true), nl = cd.getUint16(p + 28, true), xl = cd.getUint16(p + 30, true), cl = cd.getUint16(p + 32, true), lo = cd.getUint32(p + 42, true);
     const name = dec.decode(new Uint8Array(cd.buffer, p + 46, nl));
-    if (method !== 0) throw new Error('compressed zips are not supported: export it from Dub Studio');
+    if (method !== 0) throw new Error('compressed zips are not supported: export it from Dub Mixer');
     const lh = new DataView(await z.slice(lo, lo + 30).arrayBuffer()), start = lo + 30 + lh.getUint16(26, true) + lh.getUint16(28, true);
     out.push({ name, data: z.slice(start, start + size) });
     p += 46 + nl + xl + cl;

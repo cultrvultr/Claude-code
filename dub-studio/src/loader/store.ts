@@ -122,10 +122,10 @@ export async function exportSong(meta: SongMeta, onFile?: (i: number, n: number)
 export async function importSong(zip: Blob, onFile?: (i: number, n: number) => void): Promise<SongMeta> {
   if (zip.size > 2e9) throw new Error('file too large');
   const files = await readZip(zip); if (files.length > 8 * 4000 + 1) throw new Error('too many files');
-  const mf = files.find(f => f.name === 'meta.json'); if (!mf || mf.data.size > 1e6) throw new Error('not a Dub Studio song');
+  const mf = files.find(f => f.name === 'meta.json'); if (!mf || mf.data.size > 1e6) throw new Error('not a Dub Mixer song');
   const raw = JSON.parse(await mf.data.text()); if (raw && typeof raw === 'object') raw.id = newSongId();   // always a new copy, under a name we choose
   const meta = cleanMeta(raw);
-  if (!meta || !meta.stems.some(Boolean)) throw new Error('not a Dub Studio song');
+  if (!meta || !meta.stems.some(Boolean)) throw new Error('not a Dub Mixer song');
   meta.played = Date.now();
   const PIECE_MAX = SEG * 192000 * 2 * 2 + 64;   // 10 s, stereo, 16-bit, at the highest rate
   let i = 0;

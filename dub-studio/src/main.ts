@@ -339,7 +339,7 @@ const silentAudio = new Audio('data:audio/wav;base64,UklGRigAAABXQVZFZm10IBAAAAA
 silentAudio.loop = true; silentAudio.setAttribute('playsinline', '');
 function media() {
   if (!('mediaSession' in navigator)) return;
-  navigator.mediaSession.metadata = new MediaMetadata({ title: A.song.title || 'Untitled', artist: 'Pocket Dub Studio' });
+  navigator.mediaSession.metadata = new MediaMetadata({ title: A.song.title || 'Untitled', artist: 'Mobile Dub Mixer' });
   navigator.mediaSession.playbackState = A.playing ? 'playing' : 'paused';
 }
 if ('mediaSession' in navigator) {
