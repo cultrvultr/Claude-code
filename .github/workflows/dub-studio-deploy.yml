@@ -35,11 +35,18 @@ jobs:
 
       - run: npm run build
 
-      # Production branch of the Pages project is "main"; deploying under that name publishes to dub-studio-7il.pages.dev
+      # Pages projects can't be renamed: the app moved from project dub-studio to mobile-dub-mixer. Made once, then a no-op.
+      - name: Make sure the Pages project exists
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: npx --yes wrangler@3.114.17 pages project list | grep -q ' mobile-dub-mixer ' || npx --yes wrangler@3.114.17 pages project create mobile-dub-mixer --production-branch main || true
+
+      # Production branch of the Pages project is "main"; deploying under that name publishes to mobile-dub-mixer.pages.dev
       - name: Deploy
         uses: cloudflare/wrangler-action@9acf94ace14e7dc412b076f2c5c20b8ce93c79cd # v3
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           workingDirectory: dub-studio
-          command: pages deploy dist --project-name dub-studio --branch main --commit-hash ${{ github.sha }}
+          command: pages deploy dist --project-name mobile-dub-mixer --branch main --commit-hash ${{ github.sha }}

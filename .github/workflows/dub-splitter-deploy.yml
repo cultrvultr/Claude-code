@@ -58,8 +58,9 @@ jobs:
 
       - name: Give the site the URL and key
         run: |
-          printf '%s' "$SPLIT_URL" | npx --yes wrangler@3.114.17 pages secret put SPLIT_URL --project-name dub-studio
-          printf '%s' "$SPLIT_KEY" | npx --yes wrangler@3.114.17 pages secret put SPLIT_KEY --project-name dub-studio
+          npx --yes wrangler@3.114.17 pages project list | grep -q ' mobile-dub-mixer ' || npx --yes wrangler@3.114.17 pages project create mobile-dub-mixer --production-branch main || true
+          printf '%s' "$SPLIT_URL" | npx --yes wrangler@3.114.17 pages secret put SPLIT_URL --project-name mobile-dub-mixer
+          printf '%s' "$SPLIT_KEY" | npx --yes wrangler@3.114.17 pages secret put SPLIT_KEY --project-name mobile-dub-mixer
 
       - name: Redeploy the site
         env:
