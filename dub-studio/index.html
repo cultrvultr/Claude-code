@@ -1,0 +1,220 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+<title>Mobile Dub Mixer</title>
+<meta name="description" content="Dub any four tracks live on your phone: faders, stepped filters, a tape echo, spring reverbs, a siren and a drum synth.">
+<meta name="theme-color" content="#17120d">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Dub Mixer">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="icon-180.png">
+<link rel="icon" href="icon.svg" type="image/svg+xml">
+</head>
+<body>
+<div id="app">
+  <header class="top">
+    <div class="brand">Dub Mixer</div>
+    <nav class="tabs" aria-label="Pages">
+      <button data-open="syn">Synare</button><button data-open="sir">Siren</button><button data-open="fx">FX</button>
+    </nav>
+  </header>
+  <div class="stripe" aria-hidden="true"><i></i><i></i><i></i></div>
+
+  <section class="card song">
+    <button class="play" id="play" aria-label="Play"><svg viewBox="0 0 20 20" id="playIcon"><path d="M5 3l12 7-12 7z"/></svg></button>
+    <div class="info">
+      <div class="row1"><button class="title link" id="songBtn"></button><b id="time">0:00 / 0:00</b></div>
+      <div class="prog" id="prog" role="slider" aria-label="Song position"><div id="progWave" aria-hidden="true"></div><i class="band" id="band"></i><i class="pos" id="pos"></i><i class="posdot" id="posDot"></i></div>
+      <div class="tools">
+        <button id="loopBtn" aria-pressed="false">Loop</button>
+        <button id="undoBtn">Undo</button>
+        <button id="resetBtn">Reset</button>
+        <button id="recBtn" class="rec" aria-pressed="false"><i></i>Rec</button>
+        <button id="helpBtn" aria-label="How to play">?</button>
+      </div>
+    </div>
+  </section>
+
+  <div class="deckrow">
+    <div class="snaps" id="snaps" aria-label="Mix snapshots: hold to store, tap to recall"><span>Mix</span><i>A</i><i>B</i><i>C</i><i>D</i></div>
+    <div class="banks" id="banks" hidden><i class="on">1–4</i><i>5–8</i></div>
+  </div>
+  <section class="strips" id="strips"></section>
+
+  <section class="pads">
+    <div class="pad" id="pSir"><div class="dot"></div><div class="nm">Siren</div><svg class="lvk" data-l="sir" aria-label="Siren level"></svg></div>
+    <div class="pad" id="pSyn"><div class="dot"></div><div class="nm">Synare</div><svg class="lvk" data-l="syn" aria-label="Synare level"></svg></div>
+  </section>
+
+  <section class="card echo">
+    <div><div class="lab"><span>Time</span><b id="rDly"></b></div><div class="bar" id="bDly"><div class="fill"></div></div></div>
+    <div><div class="lab"><span>Repeats</span><b id="rRep"></b></div><div class="bar" id="bRep"><div class="fill"></div></div></div>
+    <div><div class="lab"><span>Return</span><b id="rRet"></b></div><div class="bar" id="bRet"><div class="fill"></div></div></div>
+    <button class="tap" id="tapBtn"><span>Tap</span><b id="bpm"></b></button>
+  </section>
+</div>
+
+<!-- FX page -->
+<div class="page" id="fx" hidden>
+  <header class="top"><div class="brand">Dub Mixer</div><nav class="tabs"><button data-open="syn">Synare</button><button data-open="sir">Siren</button><button class="on" data-close>Mixer</button></nav></header>
+  <div class="stripe" aria-hidden="true"><i></i><i></i><i></i></div>
+  <div class="fxrow"><div class="ftabs" id="fxTabs"><button data-t="echo" class="on">Echo</button><button data-t="verb">Verb</button></div></div>
+  <div class="fxp scroll" data-p="echo">
+    <div class="card"><div class="lab"><span>Time</span><b id="xTempo"></b></div>
+      <div class="seg" id="xSync" style="--n:2"><i>Sync</i><i>Free</i></div>
+      <div class="seg" id="xDiv" style="--n:5"><i>1/16</i><i>1/16.</i><i>1/8</i><i>1/8.</i><i>1/4</i><i>1/4.</i><i>1/2</i><i>1/2.</i><i>1 bar</i></div>
+      <p class="note" id="xNote"></p></div>
+    <div class="card"><div class="lab"><span>Width</span></div>
+      <div class="seg" id="xWid" style="--n:3"><i>Mono</i><i>Stereo</i><i>Ping-pong</i></div>
+      <p class="note" id="xWNote"></p></div>
+    <div class="card"><div class="lab"><span>Tone</span></div><div class="two">
+      <div><div class="lab"><span>Echo bass</span><b id="rBass"></b></div><div class="bar bi" id="bBass"><div class="c"></div><div class="mid"></div></div></div>
+      <div><div class="lab"><span>Echo treble</span><b id="rTreb"></b></div><div class="bar bi" id="bTreb"><div class="c"></div><div class="mid"></div></div></div></div>
+      <p class="note">Shapes the echoes only. Each repeat goes back through it, so the change builds. Double tap for flat.</p></div>
+    <div class="card"><div class="two">
+      <div><div class="lab"><span>Echo to verb</span><b id="rE2V"></b></div><div class="bar" id="bE2V"><div class="fill"></div></div></div>
+      <div><div class="lab"><span>Echo volume</span><b id="rRet2"></b></div><div class="bar" id="bRet2"><div class="fill"></div></div></div></div>
+      <p class="note">Echo volume is the mixer's Return: move one and the other follows.</p></div>
+    <div class="card"><div class="lab"><span>Siren and Synare</span><b id="rMix"></b></div><div class="bar" id="bMix"><div class="fill"></div></div>
+      <p class="note">Dry / wet for the two instruments: 0 dry only, 5 both, 10 echoes only.</p></div>
+  </div>
+  <div class="fxp scroll" data-p="verb" hidden>
+    <div class="card"><div class="lab"><span>Verb</span></div><div class="seg" id="vSel" style="--n:3"></div></div>
+    <div class="card"><div class="lab"><span>Decay</span><b id="rDec"></b></div>
+      <svg id="vGraph" viewBox="0 0 300 64" preserveAspectRatio="none"></svg>
+      <div class="bar" id="bDec"><div class="fill"></div></div>
+      <p class="note">The tail fades out from the line. The picture is the verb itself.</p></div>
+    <div class="card"><div class="two">
+      <div><div class="lab"><span>Low cut</span><b id="rLC"></b></div><div class="bar" id="bLC"><div class="fill"></div></div></div>
+      <div><div class="lab"><span>High cut</span><b id="rHC"></b></div><div class="bar" id="bHC"><div class="fill"></div></div></div></div>
+      <p class="note">Filters the verb only. Low cut keeps it out of the bass (150 is a good start).</p></div>
+    <div class="card"><div class="lab"><span>Return</span><b id="rVRet"></b></div><div class="bar" id="bVRet"><div class="fill"></div></div></div>
+  </div>
+</div>
+
+<!-- Synare page -->
+<div class="page" id="syn" hidden>
+  <header class="top"><div class="brand">Dub Mixer</div><nav class="tabs"><button class="on">Synare</button><button data-open="sir">Siren</button><button data-close>Mixer</button></nav></header>
+  <div class="stripe" aria-hidden="true"><i></i><i></i><i></i></div>
+  <div class="card readout"><div><span>Pitch</span><b id="rHz"></b></div><div><span>Decay</span><b id="rSDec"></b></div><div><span>Wobble</span><b id="rWob">off</b></div></div>
+  <div class="xy" id="xy" aria-label="Synare pad: tap to strike, slide sideways for pitch, drag up or down for decay, second finger for wobble"><i class="cross" id="xyDot"></i>
+    <p>Tap to hit · higher is harder<br>Slide sideways: pitch · Hold and drag: decay<br>Second finger: wobble</p></div>
+</div>
+
+<!-- Siren page -->
+<div class="page" id="sir" hidden>
+  <header class="top"><div class="brand">Dub Mixer</div><nav class="tabs"><button data-open="syn">Synare</button><button class="on">Siren</button><button data-close>Mixer</button></nav></header>
+  <div class="stripe" aria-hidden="true"><i></i><i></i><i></i></div>
+  <div class="scroll sirwrap">
+    <div class="card"><div class="lab"><span>Base</span></div><div class="seg" id="sBase" style="--n:3"><i>1</i><i>2</i><i>3</i></div></div>
+    <div class="card"><div class="lab"><span>Mode</span></div><div class="seg" id="sMode" style="--n:4"><i>Sweep</i><i>Pulse</i><i>Two-tone</i><i>Wail</i></div></div>
+    <div class="card"><div class="lab"><span>Beat</span></div><div class="seg" id="sBeat" style="--n:4"><i>Off</i><i>1</i><i>2</i><i>3</i></div></div>
+    <div class="card"><div class="lab"><span>Trig switch</span></div><div class="seg" id="sTrigMode" style="--n:2"><i>Toggle</i><i>Hold</i></div></div>
+    <div class="sbtns"><button class="big" id="sTrig">Trig</button><button class="big" id="sSig">Signal</button><button class="big" id="sSwoop">Swoop</button></div>
+    <div class="card"><div class="lab"><span>Volume</span><b id="rSVol"></b></div><div class="bar" id="bSVol"><div class="fill"></div></div></div>
+  </div>
+</div>
+
+<!-- Start -->
+<div id="start" class="scroll">
+  <div class="wrap">
+    <h1>Mobile<span>Dub Mixer</span></h1>
+    <div class="lfds" aria-hidden="true"><div class="lfd"><i><b style="top:12%"></b></i></div><div class="lfd"><i><b style="top:30%"></b></i></div><div class="lfd"><i><b style="top:64%"></b></i></div><div class="lfd"><i><b style="top:20%"></b></i></div></div>
+    <p class="sub">4 to 8 tracks. Faders, filters, tape echo, spring verb, siren.</p>
+    <button id="goLast" class="go" hidden>Continue <span></span></button>
+    <button id="goLib" class="go">Library</button>
+    <button id="goHelp" class="go alt">How to play</button>
+    <p class="install" id="install" hidden>Add to your Home Screen to keep your songs: tap <b>Share</b>, then <b>Add to Home Screen</b>.</p>
+  </div>
+</div>
+
+<!-- Sheets -->
+<div class="sheetbg" id="songSheet" hidden><div class="sheet scroll">
+  <div class="shtop"><h2>Song</h2><button class="libbtn" id="libBtn">Library</button><button class="x" data-x aria-label="Close">&times;</button></div>
+  <label class="fld"><span>Title</span><input id="fTitle" type="text" maxlength="60"></label>
+  <label class="fld"><span>Tempo (BPM)</span><input id="fBpm" type="number" min="40" max="220" step="0.1" inputmode="decimal"></label>
+  <p class="note" id="bpmNote"></p>
+  <label class="spread"><input type="checkbox" id="fSpread" checked><span>Stereo spread<small>Places each part left or right by its name. Fine-tune with Pan below.</small></span></label>
+  <div id="slots"></div>
+  <p class="note">Already have the parts as separate files? Tap Load on each track, and + Add track for more (up to 8).</p>
+</div></div>
+
+<div class="sheetbg" id="addSheet" hidden><div class="sheet scroll">
+  <div class="shtop"><h2>Add a song</h2><button class="x" data-x aria-label="Close">&times;</button></div>
+  <div id="addAsk">
+    <p class="addq">Split <b id="addName"></b> into parts?</p>
+    <button class="choice" id="addSplit"><b>Split into parts</b><span>Drums, bass, vocals and more, each on its own fader. Done in the cloud in a minute or two.</span><span id="splitModel"></span></button>
+    <button class="choice alt" id="addKeep"><b>Keep as one track</b><span>Ready right away, as one stereo channel. Echo, verb, cut and the siren still work.</span></button>
+  </div>
+  <div class="splitrun" id="splitRun" hidden>
+    <p class="addq">Splitting <b id="splitName"></b></p>
+    <div class="bar" id="splitBar"><div class="fill"></div></div>
+    <p class="splitstat" id="splitStatus"></p>
+    <p class="note">Keep Dub Mixer open and the screen on.</p>
+    <button class="wide alt" id="splitCancel">Cancel</button>
+  </div>
+  <p class="note">Splitting runs Demucs (htdemucs_6s, by Meta) on a Modal server. Your song is sent there for the split and deleted within an hour. Very good, not perfect: some bleed between parts is normal.</p>
+</div></div>
+
+<div class="sheetbg" id="libSheet" hidden><div class="sheet scroll">
+  <div class="shtop"><h2>Library</h2><button class="x" data-x aria-label="Close">&times;</button></div>
+  <button class="wide" id="addSong">+ Add song</button>
+  <p class="note">One song file (MP3, M4A, WAV…) from Files, AirDrop or Voice Memos. Songs from Apple Music are copy protected and can't be added. Already split into parts? <button class="link" id="addParts">Build a song from parts</button>.</p>
+  <input type="file" id="addFile" accept="audio/*,.mp3,.m4a,.wav,.aif,.aiff,.flac,.ogg" hidden>
+  <p class="note" id="libStore"></p>
+  <div id="libSongs"></div>
+  <h3 class="libh" id="libTakesH">Takes</h3>
+  <div id="libTakes"></div>
+  <p class="note libimport">Got a song from a friend? <button class="link" id="libImport">Import a song file (.zip)</button>. Export one from its ⋯ menu.</p>
+  <input type="file" id="importFile" accept=".zip,application/zip" hidden>
+</div></div>
+
+<div class="sheetbg" id="recSheet" hidden><div class="sheet">
+  <div class="shtop"><h2>Your dub</h2><button class="x" data-x aria-label="Close">&times;</button></div>
+  <audio id="recAudio" controls playsinline></audio>
+  <button class="wide" id="recShare">Share or save</button>
+  <p class="note">Saved in the Library with this song.</p>
+</div></div>
+
+<div class="sheetbg" id="helpSheet" hidden><div class="sheet scroll">
+  <div class="shtop"><h2>How to play</h2><button class="x" data-x aria-label="Close">&times;</button></div>
+  <button class="wide" id="tourBtn">Take the tour</button>
+  <dl class="help">
+    <dt>Play</dt><dd>Starts and stops. Tap or drag the line to jump. Space bar on a keyboard.</dd>
+    <dt>Loop, Cues</dt><dd>Loop repeats 4 bars from where you are; tap again to let it run on. Hold Loop to drop a cue at the playhead: a tap near a cue on the line jumps right to it.</dd>
+    <dt>Fader</dt><dd>Drag up and down. Double tap for full.</dd>
+    <dt>Cut</dt><dd>The stepped filter. Up cuts the bass (high pass), down cuts the top (low pass). Double tap for off.</dd>
+    <dt>Echo, Verb</dt><dd>Send the part into the tape echo or the reverb. Double tap for zero.</dd>
+    <dt>Throw</dt><dd>Hold to send the whole part into the echo. Let go and the echoes ring on.</dd>
+    <dt>Mute, Solo</dt><dd>Tap to drop the part out. Press and hold to solo it: the button turns green and only that part plays for as long as you hold. Let go and everything is back as it was. Hold two at once to hear two.</dd>
+    <dt>Knobs</dt><dd>Drag up or down: a short flick turns them all the way. Creep slowly for fine moves. Double tap to reset.</dd>
+    <dt>Siren, Synare</dt><dd>The Siren plays while held (set its Trig switch to Toggle on the Siren page to latch it). The Synare hits on each tap. Both play the sound set on their pages. Higher on the Synare button hits harder. The small knob is the level.</dd>
+    <dt>Echo</dt><dd>Time, Repeats (past 9 it runs away: drag below 9 to calm it), Return. Tap sets the tempo.</dd>
+    <dt>FX</dt><dd>Sync or Free time, width, echo tone, echo into verb, and the reverb's type, decay and cuts.</dd>
+    <dt>Mix A B C D</dt><dd>Hold a letter to store the whole mix (faders, sends, cuts, echo and verb). Tap it to bring the mix back, mid-song.</dd>
+    <dt>Rec</dt><dd>Records what you hear. Share or save it when you stop.</dd>
+    <dt>Pan, Stereo spread</dt><dd>Songs open in stereo: each part is placed left or right by its name (drums, bass and vocals stay in the middle). Turn Stereo spread off in the Song sheet for mono, or move any part with its Pan slider.</dd>
+    <dt>Nudge</dt><dd>In the Song sheet, each track has a Nudge in milliseconds to line up parts that were exported a little early or late.</dd>
+        <dt>Library</dt><dd>All your songs, the demo first. Tap + Add song and pick one song file: the app asks whether to split it into parts (drums, bass, vocals…) or keep it as one track. Each song keeps its own mix, A–D and takes. The ⋯ next to a song exports, renames or deletes it.</dd>
+    <dt>Main menu</dt><dd>Tap the Dub Mixer logo for the main menu: continue the song you are on, or open the Library.</dd>
+    <dt>Song</dt><dd>Tap the song title for its settings: title, tempo, stereo spread, and each part's name, pan, nudge and WAV. With more than 4 parts, swipe sideways across the strips to switch between 1–4 and 5–8.</dd>
+    <dt>No sound</dt><dd>Volume up. Bluetooth headphones add delay to the pads: use wired or the speaker to play live.</dd>
+  </dl>
+  <div class="credit">
+    <h3>With thanks</h3>
+    <p>The idea and the concept come from the <b>4 Track Pocket Dub Studio</b> by Kibir La Amlak: a beautiful way to dub a song live on your phone. Thank you for the inspiration. Go and play the original, with its own song and hand-built echo, siren and Synare:</p>
+    <a href="https://www.kibir-la-amlak.com/dubstudio/" target="_blank" rel="noopener">kibir-la-amlak.com/dubstudio</a>
+  </div>
+</div></div>
+
+<input type="file" id="oneFile" accept="audio/*,.mp3,.m4a,.wav,.aif,.aiff,.flac,.ogg" hidden>
+<input type="file" id="partsFiles" accept="audio/*,.mp3,.m4a,.wav,.aif,.aiff,.flac,.ogg" multiple hidden aria-hidden="true">
+<div id="toast" role="status" hidden></div>
+<div id="turn" role="status"><p>Turn your phone upright</p></div>
+<script type="module" src="/src/main.ts"></script>
+</body>
+</html>

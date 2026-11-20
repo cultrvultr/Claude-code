@@ -1,0 +1,68 @@
+name: Deploy Dub Studio splitter to Modal
+
+# Needs repository secrets MODAL_TOKEN_ID and MODAL_TOKEN_SECRET (modal.com > Settings > API Tokens),
+# plus the CLOUDFLARE_API_TOKEN / CLOUDFLARE_ACCOUNT_ID the site deploy already uses.
+# It deploys dub-studio/modal/splitter.py, gives the site its URL and key, then redeploys the site so they take effect.
+
+on:
+  push:
+    branches: [main, claude/brave-mendel-dxnsda]
+    paths: ['dub-studio/modal/**', '.github/workflows/dub-splitter-deploy.yml']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: write
+
+concurrency:
+  group: dub-splitter-deploy
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      MODAL_TOKEN_ID: ${{ secrets.MODAL_TOKEN_ID }}
+      MODAL_TOKEN_SECRET: ${{ secrets.MODAL_TOKEN_SECRET }}
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+
+      - name: Check secrets
+        run: |
+          if [ -z "$MODAL_TOKEN_ID" ] || [ -z "$MODAL_TOKEN_SECRET" ]; then
+            echo "::error::Add MODAL_TOKEN_ID and MODAL_TOKEN_SECRET in the repository's Settings > Secrets and variables > Actions"; exit 1
+          fi
+
+      - name: Install Modal
+        run: python3 -m venv /tmp/venv && /tmp/venv/bin/pip install -q modal==1.6.4
+
+      # The key between the site and the splitter is derived from the Modal secret, so nothing else has to be stored
+      - name: Key
+        run: |
+          KEY=$(printf '%s' "$MODAL_TOKEN_SECRET:dub-split" | sha256sum | cut -c1-48)
+          echo "::add-mask::$KEY"
+          echo "SPLIT_KEY=$KEY" >> "$GITHUB_ENV"
+
+      - name: Deploy to Modal
+        run: |
+          /tmp/venv/bin/modal secret create dub-splitter SPLIT_KEY="$SPLIT_KEY" --force
+          /tmp/venv/bin/modal deploy dub-studio/modal/splitter.py
+          URL=$(/tmp/venv/bin/python -c "import modal; print(modal.Function.from_name('dub-splitter', 'web').get_web_url())")
+          echo "Splitter: $URL"
+          echo "SPLIT_URL=$URL" >> "$GITHUB_ENV"
+
+      - name: Give the site the URL and key
+        run: |
+          npx --yes wrangler@3.114.17 pages project list | grep -q ' mobile-dub-mixer ' || npx --yes wrangler@3.114.17 pages project create mobile-dub-mixer --production-branch main || true
+          printf '%s' "$SPLIT_URL" | npx --yes wrangler@3.114.17 pages secret put SPLIT_URL --project-name mobile-dub-mixer
+          printf '%s' "$SPLIT_KEY" | npx --yes wrangler@3.114.17 pages secret put SPLIT_KEY --project-name mobile-dub-mixer
+
+      - name: Redeploy the site
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh workflow run dub-studio-deploy.yml --repo "$GITHUB_REPOSITORY" --ref "$GITHUB_REF_NAME"
